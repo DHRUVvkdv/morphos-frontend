@@ -68,51 +68,60 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-indigo-900 text-white flex flex-col">
-      {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-900 bg-opacity-90">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-indigo-950 text-white flex flex-col">
+      {/* Header with improved styling */}
+      <header className="border-b border-gray-800 bg-gray-900 bg-opacity-90 sticky top-0 z-50 shadow-md">
+        <div className="container mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center">
-            <span className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-600">
+            <span className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-600">
               Morphos
             </span>
           </div>
-          <div className="flex items-center space-x-4">
-            <button className="text-gray-300 hover:text-white">Profile</button>
-            <button className="text-gray-300 hover:text-white">Settings</button>
-            <button className="px-3 py-1 rounded-md bg-red-600 hover:bg-red-700">
+          <nav className="flex items-center space-x-6">
+            <button className="text-gray-300 hover:text-white transition-colors font-medium">Profile</button>
+            <button className="text-gray-300 hover:text-white transition-colors font-medium">Settings</button>
+            <button className="px-4 py-2 rounded-md bg-red-600 hover:bg-red-700 transition-colors font-medium shadow-sm">
               Sign Out
             </button>
-          </div>
+          </nav>
         </div>
       </header>
 
-      {/* Main Content - Three-column Layout */}
+      {/* Main Content - More balanced three-column Layout */}
       <main className="flex flex-grow">
-        {/* Left Sidebar - Available Workouts */}
-        <aside className="w-64 bg-gray-800 bg-opacity-50 overflow-y-auto">
-          <div className="p-4">
-            <h2 className="text-xl font-semibold mb-4 text-blue-400">Available Workouts</h2>
-            <div className="space-y-2">
+        {/* Left Sidebar - Available Workouts with refined styling */}
+        <aside className="w-72 bg-gray-800 bg-opacity-60 overflow-y-auto border-r border-gray-800">
+          <div className="p-5">
+            <h2 className="text-xl font-semibold mb-5 text-blue-400 flex items-center">
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              Available Workouts
+            </h2>
+            <div className="space-y-3">
               {workouts.map((workout) => (
                 <div
                   key={workout.id}
-                  className={`p-3 rounded-lg cursor-pointer transition-all ${
+                  className={`p-4 rounded-lg cursor-pointer transition-all duration-200 hover:translate-x-1 ${
                     selectedWorkout === workout.id
-                      ? "bg-indigo-900 ring-1 ring-blue-500"
-                      : "bg-gray-700 hover:bg-gray-600"
+                      ? "bg-gradient-to-r from-indigo-900 to-indigo-800 ring-1 ring-blue-500 shadow-lg"
+                      : "bg-gray-800 hover:bg-gray-700 shadow"
                   }`}
                   onClick={() => setSelectedWorkout(workout.id)}
                 >
-                  <h3 className="font-medium">{workout.name}</h3>
-                  <p className="text-gray-400 text-xs mt-1">
+                  <h3 className="font-medium text-lg">{workout.name}</h3>
+                  <p className="text-gray-400 text-sm mt-1.5">
                     {workout.description}
                   </p>
-                  <div className="flex justify-between text-xs mt-2">
-                    <span className="text-blue-400">
+                  <div className="flex justify-between text-xs mt-3">
+                    <span className={`px-2 py-1 rounded-full ${
+                      workout.difficulty === "Beginner" ? "bg-green-900/50 text-green-400" :
+                      workout.difficulty === "Intermediate" ? "bg-yellow-900/50 text-yellow-400" :
+                      "bg-red-900/50 text-red-400"
+                    }`}>
                       {workout.difficulty}
                     </span>
-                    <span className="text-purple-400">
+                    <span className="px-2 py-1 rounded-full bg-purple-900/50 text-purple-400">
                       {workout.equipment}
                     </span>
                   </div>
@@ -121,11 +130,14 @@ export default function HomePage() {
             </div>
             
             {selectedWorkout && (
-              <div className="mt-4">
-                {/* <Link href={`/workout/${selectedWorkout}`}> */}
+              <div className="mt-6">
                 <Link href={"/coach"}>
-                  <button className="w-full px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-md font-medium hover:from-blue-600 hover:to-indigo-700 transition duration-300">
-                    Start Workout
+                  <button className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 rounded-md font-medium hover:from-blue-700 hover:to-indigo-800 transition duration-300 shadow-lg flex justify-center items-center space-x-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Start Workout</span>
                   </button>
                 </Link>
               </div>
@@ -133,21 +145,26 @@ export default function HomePage() {
           </div>
         </aside>
 
-        {/* Middle Area - Chatbot */}
-        <div className="flex-grow flex flex-col p-6">
-          <div className="flex-grow flex flex-col bg-gray-800 bg-opacity-50 rounded-xl p-4 mb-6 overflow-hidden">
-            <h2 className="text-xl font-semibold mb-4 text-purple-400">Fitness Assistant</h2>
-            
+        {/* Middle Area - Content area with tighter AI assistant */}
+        <div className="flex-grow flex flex-col p-6 max-w-3xl mx-auto">
+          {/* Welcome Section */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400">Welcome to Morphos</h1>
+            <p className="text-gray-300">Your AI-powered fitness coach with real-time pose tracking and emotion-based motivation</p>
+          </div>
+          
+          {/* AI Assistant with reduced width */}
+          <div className="bg-gray-800 bg-opacity-80 rounded-xl p-6 shadow-lg border border-gray-700 mb-6 max-w-2xl mx-auto w-full">            
             {/* Chat History Area */}
-            <div className="flex-grow overflow-y-auto mb-4 space-y-4 p-2">
+            <div className="h-64 overflow-y-auto mb-4 space-y-4 p-2 bg-gray-900 bg-opacity-50 rounded-lg">
               {chatHistory.map((chat, index) => (
                 <div 
                   key={index} 
                   className={`${
                     chat.type === "user" 
-                      ? "ml-auto bg-blue-600 rounded-tl-lg rounded-tr-lg rounded-bl-lg" 
-                      : "mr-auto bg-gray-700 rounded-tr-lg rounded-tl-lg rounded-br-lg"
-                  } max-w-[80%] p-3`}
+                      ? "ml-auto bg-gradient-to-r from-blue-600 to-indigo-600 rounded-tl-lg rounded-tr-lg rounded-bl-lg shadow-md" 
+                      : "mr-auto bg-gray-700 rounded-tr-lg rounded-tl-lg rounded-br-lg shadow-md"
+                  } max-w-[80%] p-3 animate-fadeIn`}
                 >
                   {chat.message}
                 </div>
@@ -158,28 +175,74 @@ export default function HomePage() {
             <form onSubmit={handleChatSubmit} className="flex">
               <input
                 type="text"
-                className="flex-grow bg-gray-700 rounded-l-md p-2 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                className="flex-grow bg-gray-700 rounded-l-md p-3 focus:outline-none focus:ring-2 focus:ring-purple-500 border-transparent"
                 placeholder="Ask about recommended workouts..."
                 value={chatMessage}
                 onChange={(e) => setChatMessage(e.target.value)}
               />
               <button 
                 type="submit"
-                className="bg-gradient-to-r from-purple-500 to-blue-600 px-4 rounded-r-md hover:from-purple-600 hover:to-blue-700"
+                className="bg-gradient-to-r from-purple-500 to-blue-600 px-5 py-3 rounded-r-md hover:from-purple-600 hover:to-blue-700 transition-colors font-medium"
               >
                 Send
               </button>
             </form>
           </div>
 
-          {/* Analytics Button */}
-          <Link href="/analytics">
-            <div className="bg-gradient-to-br from-indigo-800 to-purple-900 rounded-xl p-6 flex items-center justify-between hover:from-indigo-700 hover:to-purple-800 transition-colors shadow-lg cursor-pointer">
-              <div>
-                <h2 className="text-2xl font-bold mb-1">Your Fitness Insights</h2>
-                <p className="text-gray-300">View your personal workout analytics and progress</p>
+          {/* Quick Stats - New Section */}
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="bg-gray-800 bg-opacity-75 rounded-xl p-4 border border-gray-700 shadow-md">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-gray-400 text-xs">Today's Goal</p>
+                  <h3 className="text-lg font-bold mt-1 text-white">85% Complete</h3>
+                </div>
+                <div className="p-2 bg-indigo-900/30 rounded-lg">
+                  <svg className="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
               </div>
-              <div className="w-12 h-12 bg-indigo-600 rounded-full flex items-center justify-center">
+            </div>
+            
+            <div className="bg-gray-800 bg-opacity-75 rounded-xl p-4 border border-gray-700 shadow-md">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-gray-400 text-xs">Current Streak</p>
+                  <h3 className="text-lg font-bold mt-1 text-white">3 Days</h3>
+                </div>
+                <div className="p-2 bg-purple-900/30 rounded-lg">
+                  <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-gray-800 bg-opacity-75 rounded-xl p-4 border border-gray-700 shadow-md">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-gray-400 text-xs">Calories Burned</p>
+                  <h3 className="text-lg font-bold mt-1 text-white">267 kcal</h3>
+                </div>
+                <div className="p-2 bg-pink-900/30 rounded-lg">
+                  <svg className="w-4 h-4 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Analytics Card - Improved Design */}
+          <Link href="/analytics">
+            <div className="bg-gradient-to-br from-indigo-900 to-purple-900 rounded-xl p-6 flex items-center justify-between hover:from-indigo-800 hover:to-purple-800 transition-all duration-300 shadow-lg cursor-pointer border border-indigo-700 transform hover:translate-y-[-2px]">
+              <div>
+                <h2 className="text-2xl font-bold mb-2">Your Fitness Insights</h2>
+                <p className="text-gray-300">View detailed analytics and track your progress</p>
+              </div>
+              <div className="w-12 h-12 bg-indigo-700 rounded-full flex items-center justify-center shadow-md">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
@@ -189,10 +252,21 @@ export default function HomePage() {
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-gray-800 py-4">
-        <div className="container mx-auto px-4 text-center text-gray-400 text-sm">
-          <p>© 2025 MotionMind. All rights reserved.</p>
+      {/* Footer with improved styling */}
+      <footer className="border-t border-gray-800 py-6">
+        <div className="container mx-auto px-6 text-center">
+          <div className="flex items-center justify-center mb-4">
+            <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-600">
+              MotionMind
+            </span>
+          </div>
+          <div className="text-gray-400 text-sm flex justify-center space-x-6 mb-4">
+            <a href="#" className="hover:text-gray-300 transition-colors">About</a>
+            <a href="#" className="hover:text-gray-300 transition-colors">Privacy</a>
+            <a href="#" className="hover:text-gray-300 transition-colors">Terms</a>
+            <a href="#" className="hover:text-gray-300 transition-colors">Contact</a>
+          </div>
+          <p className="text-gray-500 text-sm">© 2025 MotionMind. All rights reserved.</p>
         </div>
       </footer>
     </div>
