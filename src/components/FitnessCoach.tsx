@@ -35,11 +35,41 @@ interface BicepCurlFeedback extends BaseFeedback {
 // Combined type
 type Feedback = TPoseFeedback | BicepCurlFeedback;
 
+// Define emotion types
+type EmotionType = 'neutral' | 'happy' | 'sad' | 'angry' | 'fearful' | 'disgusted' | 'surprised' | 'tired' | 'detecting...' | 'No face detected' | 'unknown';
+
+// Track type from Spotify
+interface SpotifyTrack {
+  id: string;
+  title: string;
+  artist: string;
+  album: string;
+  image_url: string | null;
+  preview_url: string | null;
+  external_url: string;
+}
+
+interface TrackList {
+  tracks: SpotifyTrack[];
+}
+
 interface PoseData {
   keypoints: number[][];
   feedback: Feedback;
   exercise_mode: string;
   error?: string;
+}
+
+interface EmotionData {
+  current_emotion: EmotionType;
+  stable_emotion: EmotionType | null;
+  eye_openness: number;
+}
+
+interface CombinedData {
+  pose_data: PoseData;
+  emotion_data: EmotionData;
+  music_recommendations: TrackList;
 }
 
 // Type guard functions
@@ -61,7 +91,26 @@ const COLORS = {
   neutral: 'rgb(180, 180, 180)',
   highlight: 'rgb(255, 215, 0)',
   text: 'rgb(240, 240, 240)',
-  shadow: 'rgb(15, 15, 20)'
+  shadow: 'rgb(15, 15, 20)',
+  happy: 'rgb(255, 223, 0)',
+  sad: 'rgb(135, 206, 235)',
+  angry: 'rgb(255, 85, 85)',
+  tired: 'rgb(150, 150, 210)',
+};
+
+// Emotion to emoji mapping
+const EMOTION_EMOJIS: Record<EmotionType, string> = {
+  'happy': '😊',
+  'sad': '😢',
+  'angry': '😠',
+  'fearful': '😨',
+  'disgusted': '😖',
+  'surprised': '😮',
+  'tired': '😴',
+  'neutral': '😐',
+  'detecting...': '🔍',
+  'No face detected': '❓',
+  'unknown': '❓'
 };
 
 const FitnessCoach: React.FC = () => {
@@ -71,6 +120,7 @@ const FitnessCoach: React.FC = () => {
   const wsRef = useRef<WebSocket | null>(null);
   const clientIdRef = useRef<string>(uuidv4());
   const requestAnimationRef = useRef<number | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [exerciseMode, setExerciseMode] = useState<string>('tpose');
@@ -80,101 +130,414 @@ const FitnessCoach: React.FC = () => {
   const [processingFrame, setProcessingFrame] = useState<boolean>(false);
   const [frameInterval, setFrameInterval] = useState<number>(200); // ms between frames
   const lastFrameSentTime = useRef<number>(0);
+  const [isFullyMounted, setIsFullyMounted] = useState<boolean>(false);
+  
+  // Emotion and music states
+  const [currentEmotion, setCurrentEmotion] = useState<EmotionType>('detecting...');
+  const [stableEmotion, setStableEmotion] = useState<EmotionType | null>(null);
+  const [recommendations, setRecommendations] = useState<SpotifyTrack[]>([]);
+  const [showMusicPanel, setShowMusicPanel] = useState<boolean>(false);
+  const [currentPlayingTrack, setCurrentPlayingTrack] = useState<string | null>(null);
   
   // Store timestamps for FPS calculation
   const lastFrameTime = useRef<number>(0);
   const fpsBuffer = useRef<number[]>([]);
   
-  // Connect to WebSocket server
+  // Lifecycle management - run once when component mounts
   useEffect(() => {
-    const clientId = clientIdRef.current;
-    const ws = new WebSocket(`ws://localhost:8000/ws/${clientId}`);
+    console.log('FitnessCoach component mounted');
     
-    ws.onopen = () => {
-      console.log('Connected to WebSocket server');
-      setIsConnected(true);
-      setError(null);
-    };
+    // Mark component as fully mounted after a short delay
+    // This ensures all initialization is complete
+    const mountTimer = setTimeout(() => {
+      setIsFullyMounted(true);
+      console.log('FitnessCoach component fully mounted');
+    }, 500);
     
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        
-        if (data.type === 'error') {
-          console.error('Server error:', data.message);
-          setError(data.message);
-        } else if (data.type === 'pose_data') {
-          setPoseData(data.data);
-          // Update exercise mode from server
-          setExerciseMode(data.data.exercise_mode);
-          
-          // Frame has been processed, ready for next one
-          setProcessingFrame(false);
-        } else if (data.type === 'mode_change') {
-          if (data.success) {
-            setExerciseMode(data.mode);
-          }
-        }
-      } catch (error) {
-        console.error('Error parsing message:', error);
-        // Reset processing flag on error too
-        setProcessingFrame(false);
-      }
-    };
-    
-    ws.onclose = () => {
-      console.log('Disconnected from WebSocket server');
-      setIsConnected(false);
-      setError('Connection to server closed. Please refresh to reconnect.');
-    };
-    
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      setError('WebSocket connection error. Please check if the server is running.');
-      setIsConnected(false);
-    };
-    
-    wsRef.current = ws;
-    
-    // Clean up on unmount
+    // Clean up everything when component unmounts
     return () => {
+      console.log('FitnessCoach component unmounting');
+      
+      clearTimeout(mountTimer);
+      
+      // Close WebSocket connection
+      if (wsRef.current) {
+        wsRef.current.onclose = null; // Prevent reconnect attempts
+        wsRef.current.close(1000, "Component unmounted");
+        wsRef.current = null;
+      }
+      
+      // Stop video tracks
+      if (videoRef.current && videoRef.current.srcObject) {
+        const stream = videoRef.current.srcObject as MediaStream;
+        stream.getTracks().forEach(track => track.stop());
+      }
+      
+      // Cancel any pending animation frames
       if (requestAnimationRef.current) {
         cancelAnimationFrame(requestAnimationRef.current);
+        requestAnimationRef.current = null;
       }
-      ws.close();
+      
+      // Stop audio
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
     };
   }, []);
   
+  // Connect to WebSocket server
+  useEffect(() => {
+    if (!isFullyMounted) return;
+    
+    // State to track connection attempts
+    let connectionAttempts = 0;
+    const maxConnectionAttempts = 3;
+    const reconnectDelay = 1500; // ms
+    
+    // Connection timeout tracker
+    let connectionTimeoutId: NodeJS.Timeout | null = null;
+    
+    // Flag to track if component is mounted
+    let isMounted = true;
+
+    const connectWebSocket = () => {
+      // Clear any existing timeout
+      if (connectionTimeoutId) {
+        clearTimeout(connectionTimeoutId);
+        connectionTimeoutId = null;
+      }
+      
+      // Don't try to connect if we've reached max attempts
+      if (connectionAttempts >= maxConnectionAttempts) {
+        if (isMounted) {
+          setError(`Failed to connect after ${maxConnectionAttempts} attempts. Please refresh the page.`);
+          setIsConnected(false);
+        }
+        return;
+      }
+      
+      connectionAttempts++;
+      console.log(`WebSocket connection attempt ${connectionAttempts}/${maxConnectionAttempts}`);
+      
+      // Generate a new client ID for each connection attempt
+      const clientId = connectionAttempts === 1 ? clientIdRef.current : uuidv4();
+      clientIdRef.current = clientId;
+      
+      try {
+        // Close existing connection if any
+        if (wsRef.current) {
+          wsRef.current.onclose = null; // Prevent onclose from triggering reconnect
+          wsRef.current.close();
+          wsRef.current = null;
+        }
+        
+        // Determine the correct WebSocket URL based on the current environment
+        // If running in a secure context (HTTPS), use WSS protocol
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        // Use the same hostname as the current page by default
+        const host = window.location.hostname;
+        // Use the explicit port where your backend is running
+        const port = 5001; // Change this if your server runs on a different port
+        
+        const wsUrl = `${protocol}//${host}:${port}/ws/${clientId}`;
+        console.log(`Attempting to connect to: ${wsUrl}`);
+        
+        const ws = new WebSocket(wsUrl);
+        
+        // Connection timeout (5 seconds)
+        connectionTimeoutId = setTimeout(() => {
+          console.log('WebSocket connection timeout. Retrying...');
+          // Only retry if still mounted
+          if (isMounted) {
+            if (ws && ws.readyState !== WebSocket.CLOSED) {
+              ws.close();
+            }
+            connectWebSocket();
+          }
+        }, 5000);
+        
+        ws.onopen = () => {
+          console.log('Connected to WebSocket server');
+          // Clear timeout since connection succeeded
+          if (connectionTimeoutId) {
+            clearTimeout(connectionTimeoutId);
+            connectionTimeoutId = null;
+          }
+          
+          if (isMounted) {
+            setIsConnected(true);
+            setError(null);
+            connectionAttempts = 0; // Reset attempt counter on success
+          }
+        };
+        
+        ws.onmessage = (event) => {
+          // Only process messages if component is still mounted
+          if (!isMounted) return;
+          
+          try {
+            const data = JSON.parse(event.data);
+            
+            if (data.type === 'error') {
+              console.error('Server error:', data.message);
+              setError(data.message);
+            } else if (data.type === 'pose_data') {
+              setPoseData(data.data);
+              // Update exercise mode from server
+              setExerciseMode(data.data.exercise_mode);
+              
+              // Frame has been processed, ready for next one
+              setProcessingFrame(false);
+            } else if (data.type === 'mode_change') {
+              if (data.success) {
+                setExerciseMode(data.mode);
+              }
+            } else if (data.type === 'combined_data') {
+              // Process combined data (pose + emotion + music)
+              setPoseData(data.pose_data);
+              setExerciseMode(data.pose_data.exercise_mode);
+              
+              // Update emotion data
+              setCurrentEmotion(data.emotion_data.current_emotion);
+              setStableEmotion(data.emotion_data.stable_emotion);
+              
+              // Update recommendations if available
+              if (data.music_recommendations && data.music_recommendations.tracks) {
+                setRecommendations(data.music_recommendations.tracks);
+              }
+              
+              // Frame has been processed, ready for next one
+              setProcessingFrame(false);
+            } else if (data.type === 'music_recommendations') {
+              // Update recommendations
+              if (data.data && data.data.tracks) {
+                setRecommendations(data.data.tracks);
+              }
+            } else {
+              console.log('Received message of unknown type:', data.type);
+            }
+          } catch (error) {
+            console.error('Error parsing WebSocket message:', error);
+            console.log('Raw message:', event.data);
+            // Reset processing flag on error too
+            setProcessingFrame(false);
+          }
+        };
+        
+        ws.onclose = (event) => {
+          console.log(`WebSocket closed with code ${event.code}. Reason: ${event.reason || 'No reason provided'}`);
+          
+          // Only attempt reconnect if component is still mounted
+          if (isMounted) {
+            setIsConnected(false);
+            
+            // Don't show error for normal closure (code 1000)
+            if (event.code !== 1000) {
+              setError('Connection to server closed. Attempting to reconnect...');
+              
+              // Attempt to reconnect with delay
+              setTimeout(() => {
+                if (isMounted) {
+                  connectWebSocket();
+                }
+              }, reconnectDelay);
+            } else {
+              setError('Connection closed. Please refresh to reconnect.');
+            }
+          }
+        };
+        
+        ws.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          
+          // Only update state if component is still mounted
+          if (isMounted) {
+            setIsConnected(false);
+            setError('WebSocket connection error. Attempting to reconnect...');
+            
+            // Close the broken connection
+            if (ws.readyState !== WebSocket.CLOSED) {
+              ws.close();
+            }
+            
+            // Attempt to reconnect with delay
+            setTimeout(() => {
+              if (isMounted) {
+                connectWebSocket();
+              }
+            }, reconnectDelay);
+          }
+        };
+        
+        wsRef.current = ws;
+      } catch (error) {
+        console.error('Error creating WebSocket:', error);
+        
+        if (isMounted) {
+          setError(`Failed to create WebSocket connection: . Please refresh the page.`);
+          setIsConnected(false);
+          
+          // Attempt to reconnect with delay
+          setTimeout(() => {
+            if (isMounted) {
+              connectWebSocket();
+            }
+          }, reconnectDelay);
+        }
+      }
+    };
+    
+    // Initial connection
+    connectWebSocket();
+    
+    // Clean up on unmount
+    return () => {
+      isMounted = false;
+      
+      if (connectionTimeoutId) {
+        clearTimeout(connectionTimeoutId);
+      }
+      
+      if (wsRef.current) {
+        // Disable all event handlers to prevent any callbacks after unmount
+        wsRef.current.onclose = null;
+        wsRef.current.onerror = null;
+        wsRef.current.onmessage = null;
+        wsRef.current.onopen = null;
+        
+        // Close with normal closure code
+        wsRef.current.close(1000, "Component unmounted");
+      }
+      
+      if (requestAnimationRef.current) {
+        cancelAnimationFrame(requestAnimationRef.current);
+      }
+    };
+  }, [isFullyMounted]);
+  
   // Initialize webcam
   useEffect(() => {
+    if (!isFullyMounted) return;
+    
     const initializeCamera = async () => {
       try {
+        // Check if mediaDevices is supported
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          // Fallback for older browsers
+          setError('Your browser doesn\'t support camera access. Please use a modern browser like Chrome, Firefox, or Edge.');
+          console.error('mediaDevices API not supported in this browser');
+          return;
+        }
+        
+        // Request camera access with constraints
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 640, height: 480 }
+          video: { 
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            facingMode: 'user' // Use front camera on mobile devices
+          }
         });
         
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          videoRef.current.play();
+          
+          // Make sure video starts playing
+          try {
+            await videoRef.current.play();
+            console.log('Camera initialized successfully');
+          } catch (playError) {
+            console.error('Error playing video:', playError);
+            setError('Could not start video playback. Please refresh and try again.');
+          }
         }
-      } catch (err) {
+      } catch (err: unknown) {
         console.error('Error accessing webcam:', err);
-        setError('Could not access webcam. Please grant camera permissions and refresh.');
+        
+        // Type guard to check if the error is a DOMException or has a name property
+        if (err && typeof err === 'object' && 'name' in err) {
+          const mediaError = err as { name: string; message?: string };
+          
+          // Provide more specific error messages based on the error
+          if (mediaError.name === 'NotAllowedError' || mediaError.name === 'PermissionDeniedError') {
+            setError('Camera access denied. Please grant camera permissions and refresh.');
+          } else if (mediaError.name === 'NotFoundError' || mediaError.name === 'DevicesNotFoundError') {
+            setError('No camera detected. Please connect a camera and refresh.');
+          } else if (mediaError.name === 'NotReadableError' || mediaError.name === 'TrackStartError') {
+            setError('Camera is already in use by another application. Please close other apps using the camera.');
+          } else if (mediaError.name === 'OverconstrainedError') {
+            setError('Camera cannot satisfy the requested constraints. Trying with default settings...');
+            // Retry with minimal constraints
+            try {
+              const basicStream = await navigator.mediaDevices.getUserMedia({ video: true });
+              if (videoRef.current) {
+                videoRef.current.srcObject = basicStream;
+                videoRef.current.play();
+              }
+            } catch (retryErr) {
+              setError('Could not access camera with default settings either. Please refresh and try again.');
+            }
+          } else {
+            // Generic error with the message if available
+            setError(`Could not access webcam: ${mediaError.message || 'Unknown error'}. Please refresh and try again.`);
+          }
+        } else {
+          // Fallback for completely unknown error types
+          setError('Could not access webcam due to an unknown error. Please refresh and try again.');
+        }
       }
     };
     
     initializeCamera();
-  }, []);
+    
+    // Cleanup function to stop all tracks when component unmounts
+    return () => {
+      if (videoRef.current && videoRef.current.srcObject) {
+        const stream = videoRef.current.srcObject as MediaStream;
+        const tracks = stream.getTracks();
+        
+        tracks.forEach(track => {
+          track.stop();
+        });
+      }
+    };
+  }, [isFullyMounted]);
   
   // Send frames to the server at regular intervals
   useEffect(() => {
-    if (!isConnected || !videoRef.current || !canvasRef.current) return;
+    if (!isFullyMounted || !isConnected || !videoRef.current || !canvasRef.current) return;
     
-// Update this part of your code
+    // Add readiness flags to ensure we only start processing when ready
+    let videoReady = false;
+    let processingActive = true;
+    
+    // Listen for when video can actually play
+    const handleVideoReady = () => {
+      console.log('Video is ready and has dimensions:', videoRef.current?.videoWidth, videoRef.current?.videoHeight);
+      videoReady = true;
+    };
+    
+    // Add event listeners to detect when video is truly ready
+    if (videoRef.current) {
+      videoRef.current.addEventListener('loadedmetadata', handleVideoReady);
+      // Also listen for the canplay event as a backup
+      videoRef.current.addEventListener('canplay', handleVideoReady);
+    }
+
     const processFrame = () => {
-      if (!videoRef.current || !canvasRef.current) return;
+      if (!processingActive || !videoRef.current || !canvasRef.current) return;
       
       const now = performance.now();
+      
+      // Only process if video is actually ready and has dimensions
+      if (!videoReady || 
+          !videoRef.current.videoWidth || 
+          !videoRef.current.videoHeight) {
+        // Video not ready yet, request next frame and try again
+        requestAnimationRef.current = requestAnimationFrame(processFrame);
+        return;
+      }
       
       // Calculate FPS for display
       const elapsed = now - lastFrameTime.current;
@@ -207,23 +570,36 @@ const FitnessCoach: React.FC = () => {
           const scaledWidth = Math.floor(videoRef.current.videoWidth * scale);
           const scaledHeight = Math.floor(videoRef.current.videoHeight * scale);
           
+          // Double-check dimensions before proceeding
+          if (scaledWidth <= 0 || scaledHeight <= 0) {
+            console.error("Video dimensions invalid:", scaledWidth, scaledHeight);
+            setProcessingFrame(false);
+            requestAnimationRef.current = requestAnimationFrame(processFrame);
+            return;
+          }
+          
           // IMPORTANT: Set canvas dimensions to match the scaled size
           canvas.width = scaledWidth;
           canvas.height = scaledHeight;
           
-          // Draw video frame to canvas at the correct size
-          context.drawImage(videoRef.current, 0, 0, scaledWidth, scaledHeight);
-          
-          // Get frame as base64 data with higher compression
-          const imageData = canvas.toDataURL('image/jpeg', 0.6);
-          
-          // Add a small check to verify data isn't empty
-          if (imageData.length > 100) { // Basic validation
-            // Send to WebSocket
-            wsRef.current.send(JSON.stringify({ image: imageData }));
-          } else {
-            console.error("Generated empty image data, skipping frame");
-            setProcessingFrame(false); // Reset the processing flag
+          try {
+            // Draw video frame to canvas at the correct size
+            context.drawImage(videoRef.current, 0, 0, scaledWidth, scaledHeight);
+            
+            // Get frame as base64 data with higher compression
+            const imageData = canvas.toDataURL('image/jpeg', 0.6);
+            
+            // Better validation of image data
+            if (imageData && imageData.startsWith('data:image/jpeg') && imageData.length > 500) {
+              // Send to WebSocket
+              wsRef.current.send(JSON.stringify({ image: imageData }));
+            } else {
+              console.error("Generated empty or invalid image data, skipping frame");
+              setProcessingFrame(false); // Reset the processing flag
+            }
+          } catch (err) {
+            console.error("Error capturing video frame:", err);
+            setProcessingFrame(false);
           }
         }
       }
@@ -235,11 +611,18 @@ const FitnessCoach: React.FC = () => {
     requestAnimationRef.current = requestAnimationFrame(processFrame);
     
     return () => {
+      processingActive = false;
       if (requestAnimationRef.current) {
         cancelAnimationFrame(requestAnimationRef.current);
       }
+      
+      // Clean up event listeners
+      if (videoRef.current) {
+        videoRef.current.removeEventListener('loadedmetadata', handleVideoReady);
+        videoRef.current.removeEventListener('canplay', handleVideoReady);
+      }
     };
-  }, [isConnected]);
+  }, [isFullyMounted, isConnected, frameInterval]);
   
   // Handle exercise mode change
   const handleModeChange = () => {
@@ -252,9 +635,69 @@ const FitnessCoach: React.FC = () => {
     }
   };
 
+  // Toggle music panel
+  const toggleMusicPanel = () => {
+    setShowMusicPanel(!showMusicPanel);
+  };
+
+  // Play preview function
+  const playPreview = (track: SpotifyTrack) => {
+    // Stop current audio if playing
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    
+    // Only play if preview URL is available
+    if (track.preview_url) {
+      const audio = new Audio(track.preview_url);
+      audio.volume = 0.5;
+      audio.play().then(() => {
+        setCurrentPlayingTrack(track.id);
+        audio.onended = () => {
+          setCurrentPlayingTrack(null);
+        };
+        audioRef.current = audio;
+      }).catch(err => {
+        console.error('Error playing preview:', err);
+        setCurrentPlayingTrack(null);
+      });
+    } else {
+      // No preview available
+      console.log('No preview available for this track');
+    }
+  };
+
+  // Open Spotify link
+  const openSpotifyLink = (url: string) => {
+    window.open(url, '_blank');
+  };
+
+  // Handle frame rate change
   const handleFrameRateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseInt(e.target.value);
     setFrameInterval(1000 / value); // Convert fps to interval in ms
+  };
+  
+  // Format emotion for display
+  const formatEmotion = (emotion: EmotionType | null): string => {
+    if (!emotion) return 'Analyzing...';
+    return emotion.charAt(0).toUpperCase() + emotion.slice(1);
+  };
+  
+  // Get emoji for emotion
+  const getEmotionEmoji = (emotion: EmotionType | null): string => {
+    if (!emotion) return '🔍';
+    return EMOTION_EMOJIS[emotion] || '❓';
+  };
+  
+  // Get color for emotion
+  const getEmotionColor = (emotion: EmotionType | null): string => {
+    if (!emotion || emotion === 'detecting...' || emotion === 'No face detected' || emotion === 'unknown') {
+      return COLORS.neutral;
+    }
+    // return COLORS[emotion] || COLORS.neutral;
+    return COLORS.neutral
   };
   
   // Draw skeleton on canvas overlay
@@ -303,6 +746,7 @@ const FitnessCoach: React.FC = () => {
       const scaleX = displayWidth / (videoWidth * 0.5);
       const scaleY = displayHeight / (videoHeight * 0.5);
       
+      // Transform keypoints to match display coordinates with mirroring
       const transformedKeypoints = poseData.keypoints.map(point => {
         if (!point || point.length < 2) return [0, 0];
         
@@ -558,8 +1002,8 @@ const FitnessCoach: React.FC = () => {
                   ${poseData.feedback.rep_phase.status === 'up' ? 'text-yellow-400' :
                     poseData.feedback.rep_phase.status === 'down' ? 'text-green-400' : 'text-cyan-400'}
                 `}>
-                  {poseData.feedback.rep_phase.status === 'up' ? 'EXTENDED' :
-                    poseData.feedback.rep_phase.status === 'down' ? 'CURLED' : 'MOVING'}
+                  {poseData.feedback.rep_phase.status === 'up' ? 'CURLED' :
+                    poseData.feedback.rep_phase.status === 'down' ? 'EXTENDED' : 'MOVING'}
                 </span>
               </div>
             </div>
@@ -586,67 +1030,216 @@ const FitnessCoach: React.FC = () => {
       </>
     );
   };
-  
-  return (
-    <div className="flex flex-col md:flex-row h-screen bg-gray-900 text-white p-4">
-      {/* Camera View and Skeleton */}
-      <div className="relative flex-1 flex items-center justify-center overflow-hidden">
-        <video
-          ref={videoRef}
-          className="w-full h-full object-cover transform scale-x-[-1]"
-          muted
-          playsInline
-        />
-        <canvas
-          ref={canvasRef}
-          className="hidden" // Hidden, just used for processing
-        />
-        <canvas
-          id="skeleton-overlay"
-          className="absolute top-0 left-0 w-full h-full z-10 pointer-events-none"
-        />
-        
-        {/* FPS Counter */}
-        <div className="absolute top-2 left-2 bg-black bg-opacity-50 px-2 py-1 rounded text-sm">
-          FPS: {fps}
-        </div>
-        
-        
-        {/* Error Message */}
-        {error && (
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-500 bg-opacity-90 p-4 rounded-lg max-w-md text-center">
-            <h3 className="font-bold mb-2">Error</h3>
-            <p>{error}</p>
-          </div>
-        )}
-      </div>
-      
-      {/* Feedback Panel */}
-      <div className="w-full md:w-64 lg:w-80 bg-gray-800 rounded-lg overflow-hidden mt-4 md:mt-0 md:ml-4 flex flex-col">
-        {/* Header */}
-        <div className="bg-blue-600 p-4">
-          <h2 className="text-xl font-bold text-center">POSE COACH</h2>
-          <p className="text-center text-sm mt-1">
-            {exerciseMode === 'tpose' ? 'T-Pose Mode' : 'Bicep Curl Mode'}
+
+  // Render music recommendations
+  const renderMusicRecommendations = () => {
+    if (recommendations.length === 0) {
+      return (
+        <div className="text-center p-4">
+          <p className="text-gray-400">
+            {stableEmotion ? "No music recommendations available." : "Waiting for emotion detection..."}
           </p>
         </div>
-        
-        {/* Status and Feedback */}
-        <div className="p-4 flex-1 overflow-y-auto">
-          {renderFeedbackSections()}
-        </div>
-        
-        {/* Footer with Controls */}
-        <div className="p-4 bg-gray-700">
-          <button 
-            onClick={handleModeChange}
-            className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-          >
-            Switch to {exerciseMode === 'tpose' ? 'Bicep Curl' : 'T-Pose'} Mode
-          </button>
-          <p className="text-xs text-center mt-2 text-gray-400">Press 'Q' to exit in the original app</p>
+      );
+    }
+
+    return (
+      <div className="space-y-3 max-h-60 overflow-y-auto p-1">
+        {recommendations.map((track) => (
+          <div key={track.id} className="flex bg-gray-700 p-2 rounded border-l-4 border-indigo-500">
+            {/* Album Art */}
+            <div className="w-12 h-12 flex-shrink-0 mr-3">
+              {track.image_url ? (
+                <img 
+                  src={track.image_url} 
+                  alt={`${track.album} cover`} 
+                  className="w-full h-full object-cover rounded"
+                />
+              ) : (
+                <div className="w-full h-full bg-gray-600 rounded flex items-center justify-center">
+                  <span className="text-gray-400 text-xs">No Image</span>
+                </div>
+              )}
+            </div>
+            
+            {/* Track Info */}
+            <div className="flex-1 min-w-0">
+              <div className="font-bold text-sm mb-1 truncate">{track.title}</div>
+              <div className="text-gray-300 text-xs truncate mb-1">{track.artist}</div>
+              
+              {/* Action Buttons */}
+              <div className="flex space-x-2">
+                {track.preview_url && (
+                  <button 
+                    onClick={() => playPreview(track)}
+                    className={`text-xs py-0.5 px-2 rounded ${
+                      currentPlayingTrack === track.id
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-indigo-900 text-indigo-300'
+                    }`}
+                  >
+                    {currentPlayingTrack === track.id ? 'Playing' : 'Play'}
+                  </button>
+                )}
+                
+                <button 
+                  onClick={() => openSpotifyLink(track.external_url)}
+                  className="text-xs py-0.5 px-2 rounded bg-green-900 text-green-300"
+                >
+                  Spotify
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // Render loading state when not fully initialized
+  if (!isFullyMounted || !isConnected) {
+    return (
+      <div className="flex flex-col h-screen bg-gray-900 text-white p-4 items-center justify-center">
+        <div className="bg-gray-800 rounded-lg p-6 max-w-md text-center shadow-lg">
+          <div className="animate-spin mx-auto mb-4 w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+          <h2 className="text-xl font-bold mb-2">Initializing Fitness Coach</h2>
+          <p className="text-gray-400">
+            {!isFullyMounted ? 'Loading application...' : 
+            !isConnected ? 'Connecting to pose detection server...' : 
+            'Preparing camera...'}
+          </p>
+          {error && (
+            <div className="mt-4 p-3 bg-red-900 bg-opacity-50 rounded-lg">
+              <p className="text-red-200">{error}</p>
+              <button 
+                onClick={() => window.location.reload()}
+                className="mt-2 px-4 py-2 bg-red-700 hover:bg-red-600 rounded-lg text-sm"
+              >
+                Retry
+              </button>
+            </div>
+          )}
         </div>
       </div>
+    );
+  }
+
+  // Regular render when everything is initialized
+  return (
+    <div className="flex flex-col h-screen bg-gray-900 text-white">
+      {/* Main Content */}
+      <div className="flex flex-col md:flex-row flex-1 p-4 overflow-hidden">
+        {/* Camera View and Skeleton */}
+        <div className="relative flex-1 flex items-center justify-center overflow-hidden bg-black rounded-lg">
+          <video
+            ref={videoRef}
+            className="w-full h-full object-cover transform scale-x-[-1]"
+            muted
+            playsInline
+          />
+          <canvas
+            ref={canvasRef}
+            className="hidden" // Hidden, just used for processing
+          />
+          <canvas
+            id="skeleton-overlay"
+            className="absolute top-0 left-0 w-full h-full z-10 pointer-events-none"
+          />
+          
+          {/* Status Bar */}
+          <div className="absolute top-0 left-0 right-0 bg-black bg-opacity-50 p-2 flex justify-between items-center">
+            {/* FPS Counter */}
+            <div className="flex items-center space-x-4">
+              <span className="text-sm">FPS: {fps}</span>
+              
+              {/* Emotion Display */}
+              <div 
+                className="flex items-center space-x-1 px-2 py-1 rounded"
+                style={{ backgroundColor: `${getEmotionColor(currentEmotion)}30` }}
+              >
+                <span className="text-lg" role="img" aria-label={currentEmotion || 'unknown'}>
+                  {getEmotionEmoji(currentEmotion)}
+                </span>
+                <span className="text-sm font-medium">{formatEmotion(currentEmotion)}</span>
+              </div>
+            </div>
+            
+            {/* Music Toggle Button */}
+            <button
+              onClick={toggleMusicPanel}
+              className="flex items-center space-x-1 px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 transition-colors"
+            >
+              <span role="img" aria-label="music">🎵</span>
+              <span className="text-sm">{showMusicPanel ? 'Hide Music' : 'Show Music'}</span>
+            </button>
+          </div>
+          
+          {/* Error Message */}
+          {error && (
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-500 bg-opacity-90 p-4 rounded-lg max-w-md text-center">
+              <h3 className="font-bold mb-2">Error</h3>
+              <p>{error}</p>
+            </div>
+          )}
+        </div>
+        
+        {/* Feedback Panel */}
+        <div className="w-full md:w-64 lg:w-80 bg-gray-800 rounded-lg overflow-hidden mt-4 md:mt-0 md:ml-4 flex flex-col">
+          {/* Header */}
+          <div className="bg-blue-600 p-4">
+            <h2 className="text-xl font-bold text-center">POSE COACH</h2>
+            <p className="text-center text-sm mt-1">
+              {exerciseMode === 'tpose' ? 'T-Pose Mode' : 'Bicep Curl Mode'}
+            </p>
+          </div>
+          
+          {/* Status and Feedback */}
+          <div className="p-4 flex-1 overflow-y-auto">
+            {renderFeedbackSections()}
+          </div>
+          
+          {/* Footer with Controls */}
+          <div className="p-4 bg-gray-700">
+            <button 
+              onClick={handleModeChange}
+              className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+            >
+              Switch to {exerciseMode === 'tpose' ? 'Bicep Curl' : 'T-Pose'} Mode
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      {/* Music Recommendations Panel */}
+      {showMusicPanel && (
+        <div className="p-4 bg-gray-800 border-t border-gray-700">
+          <div className="flex justify-between items-center mb-2">
+            <div className="flex items-center space-x-2">
+              <h3 className="text-lg font-bold">Music Based on Your Mood</h3>
+              {stableEmotion && (
+                <div 
+                  className="inline-flex items-center space-x-1 px-2 py-1 rounded text-sm"
+                  style={{ backgroundColor: `${getEmotionColor(stableEmotion)}30` }}
+                >
+                  <span className="text-lg" role="img" aria-label={stableEmotion}>
+                    {getEmotionEmoji(stableEmotion)}
+                  </span>
+                  <span>{formatEmotion(stableEmotion)}</span>
+                </div>
+              )}
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <svg className="h-5 w-5 text-green-500" viewBox="0 0 168 168" xmlns="http://www.w3.org/2000/svg">
+                <path fill="currentColor" d="M83.996 0C37.747 0 0 37.747 0 84c0 46.251 37.747 84 83.996 84 46.254 0 84.004-37.749 84.004-84 0-46.253-37.75-84-84.004-84zm38.447 121.113c-1.5 2.461-4.7 3.24-7.16 1.74-19.647-11.997-44.374-14.703-73.452-8.047-2.809.644-5.609-1.117-6.249-3.925-.643-2.809 1.11-5.609 3.926-6.249 31.901-7.288 59.263-4.154 81.337 9.334 2.46 1.5 3.24 4.701 1.738 7.161v-.004zm10.266-22.861c-1.894 3.073-5.912 4.037-8.981 2.15-22.505-13.834-56.822-17.841-83.447-9.759-3.453 1.043-7.1-.903-8.148-4.35-1.04-3.453.907-7.093 4.354-8.143 30.413-9.228 68.221-4.758 94.071 11.127 3.07 1.89 4.04 5.91 2.151 8.976v-.001zm.88-23.744c-26.994-16.031-71.52-17.505-97.289-9.684-4.138 1.255-8.514-1.081-9.768-5.219-1.254-4.14 1.08-8.513 5.221-9.771 29.581-8.98 78.756-7.245 109.83 11.202 3.73 2.209 4.95 7.016 2.74 10.733-2.2 3.722-7.02 4.949-10.73 2.739h-.004z"/>
+              </svg>
+              <span className="text-xs text-gray-400">Powered by Spotify</span>
+            </div>
+          </div>
+          
+          {renderMusicRecommendations()}
+        </div>
+      )}
     </div>
   );
 };
