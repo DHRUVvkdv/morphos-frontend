@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
+//import Image from 'next/image';
 import Link from 'next/link';
 
 export default function LandingPage() {
@@ -31,9 +31,9 @@ export default function LandingPage() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/auth/page">
+            <Link href="/auth">
               <button className="px-8 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full font-medium hover:shadow-lg hover:from-blue-600 hover:to-indigo-700 transition duration-300 transform hover:-translate-y-1">
-                Get Started Free
+                Sign In
               </button>
             </Link>
             <button className="px-8 py-3 bg-transparent border-2 border-gray-400 rounded-full font-medium hover:border-white transition duration-300">
@@ -139,56 +139,6 @@ export default function LandingPage() {
                 </svg>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials */}
-      <section className="py-20 px-4 md:px-8">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">What Our Users Say</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {[
-              {
-                name: 'Alex Johnson',
-                role: 'Fitness Enthusiast',
-                content: 'The real-time form correction has completely transformed my home workouts. It\'s like having a personal trainer with me 24/7.',
-                rating: 5
-              },
-              {
-                name: 'Sarah Chen',
-                role: 'Busy Professional',
-                content: 'I love how the app adapts to my energy levels. When I\'m feeling down, it knows exactly what music to play to get me motivated again.',
-                rating: 5
-              },
-              {
-                name: 'Michael Peters',
-                role: 'Former Athlete',
-                content: 'The detailed analytics have helped me break through plateaus and see consistent progress in my strength training journey.',
-                rating: 4
-              }
-            ].map((testimonial, index) => (
-              <div key={index} className="bg-gray-800 bg-opacity-50 p-8 rounded-xl">
-                <div className="flex items-center mb-4">
-                  {[...Array(testimonial.rating)].map((_, i) => (
-                    <svg key={i} className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                  ))}
-                </div>
-                <p className="text-gray-300 mb-6">"{testimonial.content}"</p>
-                <div className="flex items-center">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 flex items-center justify-center font-bold text-sm mr-3">
-                    {testimonial.name.charAt(0)}
-                  </div>
-                  <div>
-                    <h4 className="font-semibold">{testimonial.name}</h4>
-                    <p className="text-gray-400 text-sm">{testimonial.role}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </section>
