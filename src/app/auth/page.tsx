@@ -1,60 +1,46 @@
-export default function AuthPage() {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-gray-50">
-        <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-xl shadow-lg">
-          <div className="text-center">
-            <h1 className="text-3xl font-bold">Sign In</h1>
-            <p className="mt-2 text-gray-600">Sign in to your account to continue</p>
-          </div>
-          
-          <form className="mt-8 space-y-6">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
-                placeholder="Email address"
-              />
-            </div>
-            
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
-                placeholder="Password"
-              />
-            </div>
-            
-            <div>
-              <button
-                type="submit"
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Sign in
-              </button>
-            </div>
-          </form>
-          
-          <div className="text-center mt-4">
-            <p className="text-sm text-gray-600">
-              Don't have an account?{' '}
-              <a href="#" className="font-medium text-indigo-600 hover:text-indigo-500">
-                Sign up
-              </a>
-            </p>
-          </div>
+import SignInForm from '@/components/auth/SignInForm';
+
+export default function SignInPage() {
+  return (
+    <div className="flex h-screen w-full">
+      {/* Left side: Form */}
+      <div className="flex w-full lg:w-1/2 flex-col justify-center px-8 md:px-16 lg:px-24">
+        <SignInForm />
+      </div>
+      
+      {/* Right side: Decorative area */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-purple-400 to-purple-600 relative overflow-hidden">
+        {/* Decorative elements */}
+        <div className="absolute inset-0">
+          <div className="absolute inset-0" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3Cpattern id='smallGrid' width='20' height='20' patternUnits='userSpaceOnUse'%3E%3Cpath d='M 20 0 L 0 0 0 20' fill='none' stroke='rgba(255, 255, 255, 0.05)' stroke-width='1'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100%25' height='100%25' fill='url(%23smallGrid)'/%3E%3C/svg%3E\")" }}></div>
+        </div>
+        
+        {/* Floating geometric shapes */}
+        <div className="absolute inset-0">
+          {Array.from({ length: 20 }).map((_, i) => (
+            <div 
+              key={i}
+              className="absolute transform rotate-45 bg-white opacity-10"
+              style={{
+                width: `${20 + Math.random() * 50}px`,
+                height: `${20 + Math.random() * 50}px`,
+                top: `${Math.random() * 100}%`,
+                left: `${Math.random() * 100}%`,
+                animationDuration: `${10 + Math.random() * 20}s`,
+                animationDelay: `${Math.random() * 5}s`,
+                animationTimingFunction: 'linear',
+                animationIterationCount: 'infinite',
+                animationName: i % 2 === 0 ? 'float-up' : 'float-across',
+              }}
+            />
+          ))}
+        </div>
+        
+        {/* Logo or branding could go here */}
+        <div className="absolute bottom-8 left-8 text-white">
+          <h2 className="text-2xl font-bold">Morphos</h2>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
