@@ -7,31 +7,37 @@ import { useUser } from "@/backend/userProvider";
 import Image from "next/image";
 
 // Define the SuggestedPrompts component
-const SuggestedPrompts = ({ onSelectPrompt }: { onSelectPrompt: (prompt: string) => void }) => {
-  const suggestedPrompts = [
-    "What dumbbell weight should I use for bicep curls?",
-    "How many squats should I do with my fitness level?",
-    "Can you recommend a workout routine for my goals?",
-    "How should I modify the plank for my fitness level?"
-  ];
-
-  return (
-    <div className="mb-3 mt-1">
-      <p className="text-xs text-gray-400 mb-2">Try asking:</p>
-      <div className="flex flex-wrap gap-2">
-        {suggestedPrompts.map((prompt, index) => (
-          <button
-            key={index}
-            onClick={() => onSelectPrompt(prompt)}
-            className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 rounded-full text-gray-200 transition-colors"
-          >
-            {prompt}
-          </button>
-        ))}
+const SuggestedPrompts = ({ onSelectPrompt, handleSubmit }: { 
+    onSelectPrompt: (prompt: string) => void,
+    handleSubmit: (prompt: string) => void 
+  }) => {
+    const suggestedPrompts = [
+      "What dumbbell weight should I use for bicep curls?",
+      "How many squats should I do with my fitness level?",
+      "Can you recommend a workout routine for my goals?",
+      "How should I modify the plank for my fitness level?"
+    ];
+  
+    return (
+      <div className="mb-3 mt-1">
+        <p className="text-xs text-gray-400 mb-2">Try asking:</p>
+        <div className="flex flex-wrap gap-2">
+          {suggestedPrompts.map((prompt, index) => (
+            <button
+              key={index}
+              onClick={() => {
+                onSelectPrompt(prompt);
+                handleSubmit(prompt);
+              }}
+              className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 rounded-full text-gray-200 transition-colors"
+            >
+              {prompt}
+            </button>
+          ))}
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
 export default function HomePage() {
     const [selectedWorkout, setSelectedWorkout] = useState<string | null>(null);
@@ -548,7 +554,20 @@ export default function HomePage() {
 
                         {/* Chat Input Area with Suggested Prompts */}
                         <form onSubmit={handleChatSubmit} className="flex flex-col">
-                            <SuggestedPrompts onSelectPrompt={(prompt) => setChatMessage(prompt)} />
+                            <SuggestedPrompts 
+                                onSelectPrompt={(prompt) => setChatMessage(prompt)} 
+                                handleSubmit={(prompt) => {
+                                    setChatMessage(prompt);
+                                    
+                                    // Create a synthetic event to pass to handleChatSubmit
+                                    const syntheticEvent = {
+                                        preventDefault: () => {}
+                                    };
+                                    
+                                    // Call the chat submit handler with the synthetic event
+                                    handleChatSubmit(syntheticEvent as React.FormEvent);
+                                }}
+                            />
                             <div className="flex">
                                 <input
                                     type="text"
