@@ -2,16 +2,18 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import ReactMarkdown from 'react-markdown';
 
 export default function HomePage() {
   const [selectedWorkout, setSelectedWorkout] = useState<string | null>(null);
-  const [chatMessage, setChatMessage] = useState("");
-  const [chatHistory, setChatHistory] = useState<Array<{type: string, message: string}>>([
+  const [chatMessage, setChatMessage] = useState<string>("");
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
     {type: "bot", message: "Hello! I'm your fitness assistant. Ask me anything about workouts that would be best for you."}
   ]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   // Sample workout data
-  const workouts = [
+  const workouts: Workout[] = [
     {
       id: "bicep-curl",
       name: "Bicep Curl",
@@ -49,22 +51,95 @@ export default function HomePage() {
     }
   ];
 
-  const handleChatSubmit = (e: React.FormEvent) => {
+  // Define the workout type
+interface Workout {
+  id: string;
+  name: string;
+  description: string;
+  difficulty: string;
+  equipment: string;
+}
+
+// Define the chat message type
+interface ChatMessage {
+  type: string;
+  message: string;
+}
+
+// Define API response type
+interface ApiResponse {
+  message?: string;
+  error?: string;
+  details?: string;
+}
+
+const handleChatSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (chatMessage.trim() === "") return;
+    if (chatMessage.trim() === "" || isLoading) return;
 
     // Add user message to chat history
-    setChatHistory([...chatHistory, {type: "user", message: chatMessage}]);
+    setChatHistory(prev => [...prev, {type: "user", message: chatMessage} as ChatMessage]);
     
-    // Placeholder for LLM response (to be implemented later)
-    setTimeout(() => {
+    // Store the message to clear the input field
+    const message = chatMessage;
+    setChatMessage("");
+    
+    // Show loading indicator
+    setIsLoading(true);
+    
+    try {
+      // Call the Gemini API route with the workouts data
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          userMessage: message,
+          workouts: workouts as Workout[]  // Pass the workouts to the API with type
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Server responded with status: ${response.status}`);
+      }
+      
+      const data = await response.json() as ApiResponse;
+      
+      // Add AI response to chat history
       setChatHistory(prev => [...prev, {
         type: "bot", 
-        message: "This is a placeholder response. In the future, I'll connect to an LLM to provide personalized workout recommendations based on your question."
-      }]);
-    }, 500);
+        message: data.message || "Sorry, I couldn't generate a response."
+      } as ChatMessage]);
+      
+      // Only call highlightRecommendedWorkouts if data.message exists
+      if (data.message) {
+        highlightRecommendedWorkouts(data.message);
+      }
+      
+    } catch (error: any) {
+      console.error('Error communicating with AI:', error);
+      setChatHistory(prev => [...prev, {
+        type: "bot", 
+        message: "Sorry, I'm having trouble connecting right now. Please try again later."
+      } as ChatMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Function to highlight workouts mentioned in the AI response
+  const highlightRecommendedWorkouts = (message: string): void => {
+    if (!message) return;
     
-    setChatMessage("");
+    // Check if any workout names are mentioned in the response
+    for (const workout of workouts) {
+      if (message.toLowerCase().includes(workout.name.toLowerCase())) {
+        setSelectedWorkout(workout.id);
+        // Break after finding the first match, or remove this to highlight the last match
+        break;
+      }
+    }
   };
 
   return (
@@ -166,9 +241,26 @@ export default function HomePage() {
                       : "mr-auto bg-gray-700 rounded-tr-lg rounded-tl-lg rounded-br-lg shadow-md"
                   } max-w-[80%] p-3 animate-fadeIn`}
                 >
-                  {chat.message}
+                  {chat.type === "bot" ? (
+                    <div className="prose prose-invert prose-sm max-w-none">
+                      <ReactMarkdown>
+                        {chat.message}
+                      </ReactMarkdown>
+                    </div>
+                  ) : (
+                    chat.message
+                  )}
                 </div>
               ))}
+              {isLoading && (
+                <div className="mr-auto bg-gray-700 rounded-tr-lg rounded-tl-lg rounded-br-lg shadow-md max-w-[80%] p-3 animate-pulse">
+                  <div className="flex space-x-2">
+                    <div className="h-2 w-2 bg-blue-400 rounded-full animate-bounce"></div>
+                    <div className="h-2 w-2 bg-blue-400 rounded-full animate-bounce delay-150"></div>
+                    <div className="h-2 w-2 bg-blue-400 rounded-full animate-bounce delay-300"></div>
+                  </div>
+                </div>
+              )}
             </div>
             
             {/* Chat Input Area */}
@@ -179,17 +271,21 @@ export default function HomePage() {
                 placeholder="Ask about recommended workouts..."
                 value={chatMessage}
                 onChange={(e) => setChatMessage(e.target.value)}
+                disabled={isLoading}
               />
               <button 
                 type="submit"
-                className="bg-gradient-to-r from-purple-500 to-blue-600 px-5 py-3 rounded-r-md hover:from-purple-600 hover:to-blue-700 transition-colors font-medium"
+                className={`bg-gradient-to-r from-purple-500 to-blue-600 px-5 py-3 rounded-r-md transition-colors font-medium ${
+                  isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:from-purple-600 hover:to-blue-700'
+                }`}
+                disabled={isLoading}
               >
-                Send
+                {isLoading ? "Sending..." : "Send"}
               </button>
             </form>
           </div>
 
-          {/* Quick Stats - New Section */}
+          {/* Rest of your existing component... */}
           <div className="grid grid-cols-3 gap-4 mb-6">
             <div className="bg-gray-800 bg-opacity-75 rounded-xl p-4 border border-gray-700 shadow-md">
               <div className="flex justify-between items-start">
@@ -235,7 +331,6 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Analytics Card - Improved Design */}
           <Link href="/analytics">
             <div className="bg-gradient-to-br from-indigo-900 to-purple-900 rounded-xl p-6 flex items-center justify-between hover:from-indigo-800 hover:to-purple-800 transition-all duration-300 shadow-lg cursor-pointer border border-indigo-700 transform hover:translate-y-[-2px]">
               <div>
@@ -257,7 +352,7 @@ export default function HomePage() {
         <div className="container mx-auto px-6 text-center">
           <div className="flex items-center justify-center mb-4">
             <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-600">
-              MotionMind
+              Morphos
             </span>
           </div>
           <div className="text-gray-400 text-sm flex justify-center space-x-6 mb-4">
@@ -266,7 +361,7 @@ export default function HomePage() {
             <a href="#" className="hover:text-gray-300 transition-colors">Terms</a>
             <a href="#" className="hover:text-gray-300 transition-colors">Contact</a>
           </div>
-          <p className="text-gray-500 text-sm">© 2025 MotionMind. All rights reserved.</p>
+          <p className="text-gray-500 text-sm">© 2025 Morphos. All rights reserved.</p>
         </div>
       </footer>
     </div>
