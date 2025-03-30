@@ -230,7 +230,7 @@ export default function HomePage() {
                     {/* AI Assistant with reduced width */}
                     <div className="bg-gray-800 bg-opacity-80 rounded-xl p-6 shadow-lg border border-gray-700 mb-6 max-w-2xl mx-auto w-full">
                         {/* Chat History Area */}
-                        <div className="h-64 overflow-y-auto mb-4 space-y-4 p-2 bg-gray-900 bg-opacity-50 rounded-lg">
+                        <div className="h-96 overflow-y-auto mb-4 space-y-4 p-2 bg-gray-900 bg-opacity-50 rounded-lg">
                             {chatHistory.map((chat, index) => (
                                 <div
                                     key={index}

@@ -11,11 +11,11 @@ import { Calendar, ChevronDown, Clock, Dumbbell, Flame, Zap } from 'lucide-react
 
 // Mock data for demonstration
 const mockWorkoutHistory = [
-  { date: '2024-03-22', duration: 35, caloriesBurned: 240, repCount: 86, formScore: 78, emotion: 'focused' },
-  { date: '2024-03-24', duration: 42, caloriesBurned: 320, repCount: 94, formScore: 82, emotion: 'happy' },
-  { date: '2024-03-25', duration: 28, caloriesBurned: 210, repCount: 72, formScore: 75, emotion: 'tired' },
-  { date: '2024-03-27', duration: 45, caloriesBurned: 350, repCount: 105, formScore: 88, emotion: 'focused' },
-  { date: '2024-03-29', duration: 40, caloriesBurned: 300, repCount: 98, formScore: 84, emotion: 'happy' },
+  { date: '03-22', duration: 35, caloriesBurned: 240, repCount: 86, formScore: 78, emotion: 'focused' },
+  { date: '03-24', duration: 42, caloriesBurned: 320, repCount: 94, formScore: 82, emotion: 'happy' },
+  { date: '03-25', duration: 28, caloriesBurned: 210, repCount: 72, formScore: 75, emotion: 'tired' },
+  { date: '03-27', duration: 45, caloriesBurned: 350, repCount: 105, formScore: 88, emotion: 'focused' },
+  { date: '03-29', duration: 40, caloriesBurned: 300, repCount: 98, formScore: 84, emotion: 'happy' },
 ];
 
 const mockExerciseProgress = [
@@ -55,7 +55,7 @@ const gradientOffset = () => {
 };
 
 const AnalyticsDashboard = () => {
-  const [timeRange, setTimeRange] = useState('Past Month');
+  //const [timeRange, setTimeRange] = useState('Past Month');
   const off = gradientOffset();
   
   return (
@@ -70,12 +70,12 @@ const AnalyticsDashboard = () => {
             <p className="text-gray-400 mt-1">Track your progress and insights</p>
           </div>
           <div className="relative">
-            <button 
+            {/* <button 
               className="flex items-center space-x-2 bg-gray-800 rounded-lg px-4 py-2 text-gray-300 border border-gray-700 hover:bg-gray-750"
             >
               <span>{timeRange}</span>
               <ChevronDown size={16} />
-            </button>
+            </button> */}
           </div>
         </div>
       </header>
@@ -418,7 +418,7 @@ const AnalyticsDashboard = () => {
       
       <footer className="mt-10 py-6 border-t border-gray-800 px-6">
         <div className="text-center text-gray-500 text-sm">
-          © 2025 MotionMind. All rights reserved.
+          © 2025 Morphos. All rights reserved.
         </div>
       </footer>
     </div>
