@@ -37,7 +37,7 @@ export default function LandingPage() {
               </button>
             </Link>
             <button
-              onClick={() => window.open("https://www.youtube.com/watch?v=Y2RtiOomxgs", "_blank")}
+              onClick={() => window.open("http://youtube.com/watch?v=uruMzYHK6UE", "_blank")}
               className="px-8 py-3 bg-transparent border-2 border-gray-400 rounded-full font-medium hover:border-white transition duration-300"
             >
               Watch Demo
@@ -138,7 +138,7 @@ export default function LandingPage() {
               <div className="aspect-video relative">
                 <iframe
                   className="absolute inset-0 w-full h-full"
-                  src="https://www.youtube.com/embed/Y2RtiOomxgs?si=C_nf0DaVImtMvR5b"
+                  src="https://www.youtube.com/embed/uruMzYHK6UE?si=vzD7UYuZFLZb-sGV"
                   title="YouTube video player"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                   referrerPolicy="strict-origin-when-cross-origin"
