@@ -8,6 +8,7 @@ import {
 } from 'recharts';
 import { Calendar, ChevronDown, Clock, Dumbbell, Flame, Zap } from 'lucide-react';
 import { useUser } from '@/backend/userProvider';
+import ReactMarkdown from 'react-markdown';
 
 // Interface for workout data from API
 interface WorkoutSession {
@@ -68,6 +69,10 @@ const AnalyticsDashboard = () => {
   const [workoutSessions, setWorkoutSessions] = useState<WorkoutSession[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [aiInsights, setAiInsights] = useState<string | null>(null);
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState<boolean>(false);
+  const [insightsError, setInsightsError] = useState<string | null>(null);
   
   // Derived statistics
   const [workoutHistoryData, setWorkoutHistoryData] = useState<WorkoutHistoryData[]>([]);
@@ -213,6 +218,106 @@ const AnalyticsDashboard = () => {
         formScore: Math.round(avgFormScore)
       };
     });
+
+    const generateAiInsights = async () => {
+      if (workoutSessions.length === 0) {
+        setInsightsError("Need workout data to generate insights");
+        return;
+      }
+      
+      setIsGeneratingInsights(true);
+      setInsightsError(null);
+      
+      try {
+        // Prepare data summary for the AI to analyze
+        const workoutSummary = {
+          totalWorkouts: totalStats.totalWorkouts,
+          totalMinutes: totalStats.totalMinutes,
+          currentStreak: totalStats.currentStreak,
+          improvementPercentages: totalStats.improvementPercentages,
+          exercises: {
+            bicepCurls: {
+              performed: workoutSessions.filter(s => s.bicep_curl_performed).length,
+              totalReps: workoutSessions.reduce((sum, s) => sum + (s.bicep_curl_performed ? s.bicep_curl_reps : 0), 0),
+              avgFormScore: Math.round(workoutSessions
+                .filter(s => s.bicep_curl_performed && s.bicep_curl_form_score > 0)
+                .reduce((sum, s) => sum + s.bicep_curl_form_score, 0) / 
+                Math.max(1, workoutSessions.filter(s => s.bicep_curl_performed && s.bicep_curl_form_score > 0).length)
+              )
+            },
+            squats: {
+              performed: workoutSessions.filter(s => s.squat_performed).length,
+              totalReps: workoutSessions.reduce((sum, s) => sum + (s.squat_performed ? s.squat_reps : 0), 0),
+              avgFormScore: Math.round(workoutSessions
+                .filter(s => s.squat_performed && s.squat_form_score > 0)
+                .reduce((sum, s) => sum + s.squat_form_score, 0) / 
+                Math.max(1, workoutSessions.filter(s => s.squat_performed && s.squat_form_score > 0).length)
+              )
+            },
+            lateralRaises: {
+              performed: workoutSessions.filter(s => s.lateral_raise_performed).length,
+              totalReps: workoutSessions.reduce((sum, s) => sum + (s.lateral_raise_performed ? s.lateral_raise_reps : 0), 0),
+              avgFormScore: Math.round(workoutSessions
+                .filter(s => s.lateral_raise_performed && s.lateral_raise_form_score > 0)
+                .reduce((sum, s) => sum + s.lateral_raise_form_score, 0) / 
+                Math.max(1, workoutSessions.filter(s => s.lateral_raise_performed && s.lateral_raise_form_score > 0).length)
+              )
+            },
+            plank: {
+              performed: workoutSessions.filter(s => s.plank_performed).length,
+              totalHoldSeconds: workoutSessions.reduce((sum, s) => sum + (s.plank_performed ? s.plank_hold_time_seconds : 0), 0),
+              avgFormScore: Math.round(workoutSessions
+                .filter(s => s.plank_performed && s.plank_form_score > 0)
+                .reduce((sum, s) => sum + s.plank_form_score, 0) / 
+                Math.max(1, workoutSessions.filter(s => s.plank_performed && s.plank_form_score > 0).length)
+              )
+            }
+          },
+          // Add workout history progression
+          recentWorkouts: workoutSessions.slice(0, 5).map(session => {
+            const date = new Date(session.date).toLocaleDateString('en-US', { 
+              month: 'short', 
+              day: 'numeric'
+            });
+            
+            const exercises = [];
+            if (session.bicep_curl_performed) exercises.push('Bicep Curl');
+            if (session.squat_performed) exercises.push('Squat');
+            if (session.lateral_raise_performed) exercises.push('Lateral Raise');
+            if (session.plank_performed) exercises.push('Plank');
+            
+            return {
+              date,
+              duration: session.duration_minutes,
+              exercises: exercises.join(', ')
+            };
+          })
+        };
+        
+        // Call API to generate insights
+        const response = await fetch('/api/insights', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ workoutSummary }),
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Server responded with status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // Set the insights
+        setAiInsights(data.insights);
+      } catch (error) {
+        console.error('Error generating AI insights:', error);
+        setInsightsError('Failed to generate insights. Please try again later.');
+      } finally {
+        setIsGeneratingInsights(false);
+      }
+    };
     
     // Process form quality data
     const formData: FormQualityData[] = sortedSessions.slice(0, 10).reverse().map(session => {
@@ -486,7 +591,175 @@ const AnalyticsDashboard = () => {
       </div>
     );
   }
+
+  const generateAiInsights = async () => {
+    if (workoutSessions.length === 0) {
+      setInsightsError("Need workout data to generate insights");
+      return;
+    }
+    
+    setIsGeneratingInsights(true);
+    setInsightsError(null);
+    
+    try {
+      // Prepare data summary for the AI to analyze
+      const workoutSummary = {
+        totalWorkouts: totalStats.totalWorkouts,
+        totalMinutes: totalStats.totalMinutes,
+        currentStreak: totalStats.currentStreak,
+        improvementPercentages: totalStats.improvementPercentages,
+        exercises: {
+          bicepCurls: {
+            performed: workoutSessions.filter(s => s.bicep_curl_performed).length,
+            totalReps: workoutSessions.reduce((sum, s) => sum + (s.bicep_curl_performed ? s.bicep_curl_reps : 0), 0),
+            avgFormScore: Math.round(workoutSessions
+              .filter(s => s.bicep_curl_performed && s.bicep_curl_form_score > 0)
+              .reduce((sum, s) => sum + s.bicep_curl_form_score, 0) / 
+              Math.max(1, workoutSessions.filter(s => s.bicep_curl_performed && s.bicep_curl_form_score > 0).length)
+            )
+          },
+          squats: {
+            performed: workoutSessions.filter(s => s.squat_performed).length,
+            totalReps: workoutSessions.reduce((sum, s) => sum + (s.squat_performed ? s.squat_reps : 0), 0),
+            avgFormScore: Math.round(workoutSessions
+              .filter(s => s.squat_performed && s.squat_form_score > 0)
+              .reduce((sum, s) => sum + s.squat_form_score, 0) / 
+              Math.max(1, workoutSessions.filter(s => s.squat_performed && s.squat_form_score > 0).length)
+            )
+          },
+          lateralRaises: {
+            performed: workoutSessions.filter(s => s.lateral_raise_performed).length,
+            totalReps: workoutSessions.reduce((sum, s) => sum + (s.lateral_raise_performed ? s.lateral_raise_reps : 0), 0),
+            avgFormScore: Math.round(workoutSessions
+              .filter(s => s.lateral_raise_performed && s.lateral_raise_form_score > 0)
+              .reduce((sum, s) => sum + s.lateral_raise_form_score, 0) / 
+              Math.max(1, workoutSessions.filter(s => s.lateral_raise_performed && s.lateral_raise_form_score > 0).length)
+            )
+          },
+          plank: {
+            performed: workoutSessions.filter(s => s.plank_performed).length,
+            totalHoldSeconds: workoutSessions.reduce((sum, s) => sum + (s.plank_performed ? s.plank_hold_time_seconds : 0), 0),
+            avgFormScore: Math.round(workoutSessions
+              .filter(s => s.plank_performed && s.plank_form_score > 0)
+              .reduce((sum, s) => sum + s.plank_form_score, 0) / 
+              Math.max(1, workoutSessions.filter(s => s.plank_performed && s.plank_form_score > 0).length)
+            )
+          }
+        },
+        // Add workout history progression
+        recentWorkouts: workoutSessions.slice(0, 5).map(session => {
+          const date = new Date(session.date).toLocaleDateString('en-US', { 
+            month: 'short', 
+            day: 'numeric'
+          });
+          
+          const exercises = [];
+          if (session.bicep_curl_performed) exercises.push('Bicep Curl');
+          if (session.squat_performed) exercises.push('Squat');
+          if (session.lateral_raise_performed) exercises.push('Lateral Raise');
+          if (session.plank_performed) exercises.push('Plank');
+          
+          return {
+            date,
+            duration: session.duration_minutes,
+            exercises: exercises.join(', ')
+          };
+        })
+      };
+      
+      // Call API to generate insights
+      const response = await fetch('/api/insights', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ workoutSummary }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Server responded with status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Set the insights
+      setAiInsights(data.insights);
+    } catch (error) {
+      console.error('Error generating AI insights:', error);
+      setInsightsError('Failed to generate insights. Please try again later.');
+    } finally {
+      setIsGeneratingInsights(false);
+    }
+  };
   
+  const renderAiInsightsSection = () => {
+    return (
+      <div className="mb-8 bg-gray-800 rounded-xl border border-gray-700 shadow-lg overflow-hidden">
+        <div className="bg-gradient-to-r from-violet-900 to-purple-900 p-4 flex justify-between items-center">
+          <div className="flex items-center">
+            <div className="p-2 bg-indigo-600 rounded-lg mr-3">
+              <Zap className="text-white" size={20} />
+            </div>
+            <h2 className="text-lg font-semibold text-white">AI Workout Insights</h2>
+          </div>
+          <button 
+            onClick={generateAiInsights}
+            disabled={isGeneratingInsights || workoutSessions.length === 0}
+            className={`px-4 py-2 rounded-lg transition-colors text-sm font-medium
+              ${isGeneratingInsights 
+                ? 'bg-gray-700 cursor-not-allowed' 
+                : workoutSessions.length === 0
+                ? 'bg-gray-700 cursor-not-allowed'
+                : 'bg-indigo-600 hover:bg-indigo-500'
+              }`}
+          >
+            {isGeneratingInsights 
+              ? <div className="flex items-center">
+                  <div className="w-4 h-4 mr-2 border-2 border-t-transparent border-white rounded-full animate-spin"></div>
+                  Generating...
+                </div>
+              : 'Generate Insights'
+            }
+          </button>
+        </div>
+        
+        <div className="p-4">
+          {insightsError ? (
+            <div className="bg-red-900/20 border border-red-900/30 text-red-200 p-3 rounded-lg text-sm">
+              <p>{insightsError}</p>
+            </div>
+          ) : !aiInsights && !isGeneratingInsights ? (
+            <div className="bg-gray-700/30 border border-gray-600/30 p-4 rounded-lg text-center">
+              <p className="text-gray-400 mb-2 text-sm">Generate AI-powered insights based on your workout data</p>
+              <p className="text-gray-500 text-xs">Get concise recommendations to improve form and consistency</p>
+            </div>
+          ) : isGeneratingInsights ? (
+            <div className="min-h-40 flex flex-col items-center justify-center">
+              <div className="w-10 h-10 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+              <p className="text-gray-400 text-sm">Analyzing your workout data...</p>
+            </div>
+          ) : (
+            <div className="prose prose-sm prose-invert prose-violet max-w-none">
+              <ReactMarkdown components={{
+                // Customize heading styles
+                h1: ({node, ...props}) => <h1 className="text-lg font-bold text-indigo-400 mb-2" {...props} />,
+                h2: ({node, ...props}) => <h2 className="text-base font-bold text-violet-400 mt-3 mb-1.5" {...props} />,
+                h3: ({node, ...props}) => <h3 className="text-sm font-bold text-pink-400 mt-2 mb-1" {...props} />,
+                // Add more spacing and custom styling for paragraphs
+                p: ({node, ...props}) => <p className="text-sm mb-2 leading-relaxed" {...props} />,
+                // Style lists better
+                ul: ({node, ...props}) => <ul className="text-sm pl-4 mb-3 space-y-1" {...props} />,
+                li: ({node, ...props}) => <li className="mb-1 text-gray-200" {...props} />
+              }}>
+                {aiInsights || ''}
+              </ReactMarkdown>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100">
       {/* Header */}
@@ -856,7 +1129,7 @@ const AnalyticsDashboard = () => {
         </div>
         
         {/* Recent Workouts Section */}
-        <div className="mt-8 bg-gray-800 rounded-xl p-5 border border-gray-700 shadow-lg">
+        <div className="mt-8 mb-8 bg-gray-800 rounded-xl p-5 border border-gray-700 shadow-lg">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-semibold text-gray-200">Recent Workouts</h2>
           </div>
@@ -953,6 +1226,7 @@ const AnalyticsDashboard = () => {
             </div>
           )}
         </div>
+        {renderAiInsightsSection()}
       </main>
       
       <footer className="mt-10 py-6 border-t border-gray-800 px-6">
