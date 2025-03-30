@@ -4,7 +4,7 @@ export default function SignInPage() {
   return (
     <div className="flex h-screen w-full">
       {/* Left side: Form */}
-      <div className="flex w-full lg:w-1/2 flex-col justify-center px-8 md:px-16 lg:px-24">
+      <div className="flex w-full lg:w-1/2 flex-col justify-center px-8 md:px-16 lg:px-24 bg-white dark:bg-[#111827]">
         <SignInForm />
       </div>
       
