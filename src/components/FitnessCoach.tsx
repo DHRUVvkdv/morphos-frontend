@@ -190,7 +190,7 @@ const FitnessCoach: React.FC = () => {
   const [showMusicPanel, setShowMusicPanel] = useState<boolean>(false);
   const [currentPlayingTrack, setCurrentPlayingTrack] = useState<string | null>(null);
 
-  const searchParams = useSearchParams();
+  const searchParams = useSearchParams() || new URLSearchParams();
 
   const mapExerciseIdToMode = (exerciseId: string | null): string => {
     switch (exerciseId) {
