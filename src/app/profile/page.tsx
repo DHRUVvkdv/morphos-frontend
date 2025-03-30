@@ -184,7 +184,7 @@ export default function ProfilePage() {
     const handleLogout = () => {
         logout();
         // Redirect to login page
-        window.location.href = "/auth/signin";
+        window.location.href = "/";
     };
 
     if (isLoading) {

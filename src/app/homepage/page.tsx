@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import ReactMarkdown from 'react-markdown';
+import { useUser } from "@/backend/userProvider";
 
 export default function HomePage() {
     const [selectedWorkout, setSelectedWorkout] = useState<string | null>(null);
@@ -11,6 +12,12 @@ export default function HomePage() {
         { type: "bot", message: "Hello! I'm your fitness assistant. Ask me anything about workouts that would be best for you." }
     ]);
     const [isLoading, setIsLoading] = useState<boolean>(false);
+    const { logout } = useUser();
+
+    const handleLogout = () => {
+        logout();
+        window.location.href = "/";
+    };
 
     // Sample workout data
     const workouts: Workout[] = [
@@ -156,7 +163,7 @@ export default function HomePage() {
                         <Link href="/profile">
                             <span className="text-gray-300 hover:text-white transition-colors font-medium">Profile</span>
                         </Link>
-                        <button className="px-4 py-2 rounded-md bg-red-600 hover:bg-red-700 transition-colors font-medium shadow-sm">
+                        <button onClick={handleLogout}  className="px-4 py-2 rounded-md bg-red-600 hover:bg-red-700 transition-colors font-medium shadow-sm">
                             Sign Out
                         </button>
                     </nav>
@@ -179,8 +186,8 @@ export default function HomePage() {
                                 <div
                                     key={workout.id}
                                     className={`p-4 rounded-lg cursor-pointer transition-all duration-200 hover:translate-x-1 ${selectedWorkout === workout.id
-                                            ? "bg-gradient-to-r from-indigo-900 to-indigo-800 ring-1 ring-blue-500 shadow-lg"
-                                            : "bg-gray-800 hover:bg-gray-700 shadow"
+                                        ? "bg-gradient-to-r from-indigo-900 to-indigo-800 ring-1 ring-blue-500 shadow-lg"
+                                        : "bg-gray-800 hover:bg-gray-700 shadow"
                                         }`}
                                     onClick={() => setSelectedWorkout(workout.id)}
                                 >
@@ -190,8 +197,8 @@ export default function HomePage() {
                                     </p>
                                     <div className="flex justify-between text-xs mt-3">
                                         <span className={`px-2 py-1 rounded-full ${workout.difficulty === "Beginner" ? "bg-green-900/50 text-green-400" :
-                                                workout.difficulty === "Intermediate" ? "bg-yellow-900/50 text-yellow-400" :
-                                                    "bg-red-900/50 text-red-400"
+                                            workout.difficulty === "Intermediate" ? "bg-yellow-900/50 text-yellow-400" :
+                                                "bg-red-900/50 text-red-400"
                                             }`}>
                                             {workout.difficulty}
                                         </span>
@@ -235,8 +242,8 @@ export default function HomePage() {
                                 <div
                                     key={index}
                                     className={`${chat.type === "user"
-                                            ? "ml-auto bg-gradient-to-r from-blue-600 to-indigo-600 rounded-tl-lg rounded-tr-lg rounded-bl-lg shadow-md"
-                                            : "mr-auto bg-gray-700 rounded-tr-lg rounded-tl-lg rounded-br-lg shadow-md"
+                                        ? "ml-auto bg-gradient-to-r from-blue-600 to-indigo-600 rounded-tl-lg rounded-tr-lg rounded-bl-lg shadow-md"
+                                        : "mr-auto bg-gray-700 rounded-tr-lg rounded-tl-lg rounded-br-lg shadow-md"
                                         } max-w-[80%] p-3 animate-fadeIn`}
                                 >
                                     {chat.type === "bot" ? (
