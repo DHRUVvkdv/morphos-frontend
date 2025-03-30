@@ -280,6 +280,7 @@ const FitnessCoach: React.FC = () => {
   // Lifecycle management - run once when component mounts
   useEffect(() => {
     console.log('FitnessCoach component mounted');
+    setExerciseMode(initialExerciseMode);
     
     // Mark component as fully mounted after a short delay
     // This ensures all initialization is complete
@@ -799,13 +800,11 @@ const FitnessCoach: React.FC = () => {
             connectionAttempts = 0; // Reset attempt counter on success
           }
 
-          if (initialExerciseMode !== 'tpose') {
-            ws.send(JSON.stringify({ 
-              command: 'set_mode', 
-              mode: initialExerciseMode 
-            }));
-            console.log(`Sent initial exercise mode: ${initialExerciseMode}`);
-          }
+          ws.send(JSON.stringify({ 
+            command: 'set_mode', 
+            mode: exerciseMode 
+          }));
+          console.log(`Sent exercise mode to server: ${exerciseMode}`);
         };
         
         ws.onmessage = (event) => {

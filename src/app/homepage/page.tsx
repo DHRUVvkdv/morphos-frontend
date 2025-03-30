@@ -15,6 +15,13 @@ export default function HomePage() {
     // Sample workout data
     const workouts: Workout[] = [
         {
+            id: "tpose",
+            name: "T-Pose",
+            description: "Calibration pose to measure your movement range",
+            difficulty: "Beginner",
+            equipment: "None",
+        },
+        {
             id: "bicep-curl",
             name: "Bicep Curl",
             description: "Build arm strength with this classic exercise",
@@ -22,18 +29,18 @@ export default function HomePage() {
             equipment: "Dumbbells",
         },
         {
-            id: "squats",
-            name: "Squats",
+            id: "squat",
+            name: "Squat",
             description: "Strengthen your lower body and core",
             difficulty: "Beginner",
             equipment: "None",
         },
         {
-            id: "push-ups",
-            name: "Push-ups",
-            description: "Full upper body workout",
+            id: "lateral-raise",
+            name: "Lateral Raise",
+            description: "Develop shoulder strength and stability",
             difficulty: "Intermediate",
-            equipment: "None",
+            equipment: "Dumbbells",
         },
         {
             id: "plank",
@@ -41,13 +48,6 @@ export default function HomePage() {
             description: "Core stability and strength",
             difficulty: "Beginner",
             equipment: "None",
-        },
-        {
-            id: "deadlift",
-            name: "Deadlift",
-            description: "Build posterior chain strength",
-            difficulty: "Advanced",
-            equipment: "Barbell",
         }
     ];
 
@@ -205,7 +205,7 @@ export default function HomePage() {
 
                         {selectedWorkout && (
                             <div className="mt-6">
-                                <Link href={"/coach"}>
+                                <Link href={`/coach?exercise=${selectedWorkout}`}>
                                     <button className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 rounded-md font-medium hover:from-blue-700 hover:to-indigo-800 transition duration-300 shadow-lg flex justify-center items-center space-x-2">
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
