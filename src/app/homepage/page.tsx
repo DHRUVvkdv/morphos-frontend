@@ -1,19 +1,55 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import ReactMarkdown from 'react-markdown';
 import { useUser } from "@/backend/userProvider";
 import Image from "next/image";
+
+// Define the SuggestedPrompts component
+const SuggestedPrompts = ({ onSelectPrompt }: { onSelectPrompt: (prompt: string) => void }) => {
+  const suggestedPrompts = [
+    "What dumbbell weight should I use for bicep curls?",
+    "How many squats should I do with my fitness level?",
+    "Can you recommend a workout routine for my goals?",
+    "How should I modify the plank for my fitness level?"
+  ];
+
+  return (
+    <div className="mb-3 mt-1">
+      <p className="text-xs text-gray-400 mb-2">Try asking:</p>
+      <div className="flex flex-wrap gap-2">
+        {suggestedPrompts.map((prompt, index) => (
+          <button
+            key={index}
+            onClick={() => onSelectPrompt(prompt)}
+            className="px-3 py-1.5 text-xs bg-gray-700 hover:bg-gray-600 rounded-full text-gray-200 transition-colors"
+          >
+            {prompt}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 export default function HomePage() {
     const [selectedWorkout, setSelectedWorkout] = useState<string | null>(null);
     const [chatMessage, setChatMessage] = useState<string>("");
     const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
-        { type: "bot", message: "Hello! I'm your fitness assistant. Ask me anything about workouts that would be best for you." }
+        { type: "bot", message: "Hello! I'm your fitness assistant. Ask me anything about workouts that would be best for you. I can provide personalized recommendations based on your profile." }
     ]);
     const [isLoading, setIsLoading] = useState<boolean>(false);
-    const { logout } = useUser();
+    const { logout, user } = useUser();
+    const [workoutSessions, setWorkoutSessions] = useState<WorkoutSession[]>([]);
+    const [statsLoading, setStatsLoading] = useState<boolean>(true);
+    const [statsError, setStatsError] = useState<string | null>(null);
+    const [totalStats, setTotalStats] = useState({
+        totalWorkouts: 0,
+        currentStreak: 0,
+        caloriesBurned: 0,
+        goalCompletion: 0
+    });
 
     const handleLogout = () => {
         logout();
@@ -74,6 +110,33 @@ export default function HomePage() {
         message: string;
     }
 
+    // Define workout session type
+    interface WorkoutSession {
+        _id: string;
+        user_email: string;
+        date: string;
+        start_time: string;
+        end_time: string;
+        duration_minutes: number;
+        tpose_performed: boolean;
+        tpose_hold_time_seconds: number;
+        tpose_form_score: number;
+        bicep_curl_performed: boolean;
+        bicep_curl_reps: number;
+        bicep_curl_form_score: number;
+        squat_performed: boolean;
+        squat_reps: number;
+        squat_form_score: number;
+        lateral_raise_performed: boolean;
+        lateral_raise_reps: number;
+        lateral_raise_form_score: number;
+        plank_performed: boolean;
+        plank_hold_time_seconds: number;
+        plank_form_score: number;
+        id: string;
+        created_at: string;
+    }
+
     // Define API response type
     interface ApiResponse {
         message?: string;
@@ -81,6 +144,192 @@ export default function HomePage() {
         details?: string;
     }
 
+    // Fetch workout data when component mounts
+    useEffect(() => {
+        fetchWorkoutData();
+    }, [user]);
+
+    const fetchWorkoutData = async () => {
+        setStatsLoading(true);
+        try {
+            // Get API key from environment or use fallback for development
+            const apiKey = process.env.NEXT_PUBLIC_API_KEY || "";
+
+            // Add user_email filter
+            const userEmail = user?.email || "anonymous@user.com";
+
+            const response = await fetch(
+                `https://morphos-backend-service-1020595365432.us-central1.run.app/exercises?email=${encodeURIComponent(userEmail)}`,
+                {
+                    method: 'GET',
+                    headers: {
+                        'accept': 'application/json',
+                        'X-API-Key': apiKey
+                    }
+                }
+            );
+
+            if (!response.ok) {
+                let errorDetails = '';
+                try {
+                    const errorBody = await response.text();
+                    errorDetails = errorBody;
+                } catch (parseError) {
+                    console.error('Failed to parse error response:', parseError);
+                }
+
+                throw new Error(`Error fetching workout data: ${response.status} - ${errorDetails}`);
+            }
+
+            const data = await response.json();
+            console.log('Successfully fetched workout data:', data);
+
+            // The API might return an object with a data property instead of an array directly
+            const workoutData = Array.isArray(data) ? data : (data.data || []);
+            setWorkoutSessions(workoutData);
+
+            // Process the data for stats
+            if (workoutData.length > 0) {
+                processWorkoutData(workoutData);
+            } else {
+                console.log('No workout data found for this user');
+                setTotalStats({
+                    totalWorkouts: 0,
+                    currentStreak: 0,
+                    caloriesBurned: 0,
+                    goalCompletion: 0
+                });
+            }
+        } catch (err) {
+            console.error('Failed to fetch workout data:', err);
+            setStatsError('Failed to load workout data. Please try again later.');
+        } finally {
+            setStatsLoading(false);
+        }
+    };
+
+    // Process workout data for stats
+    const processWorkoutData = (data: WorkoutSession[]) => {
+        if (!data || data.length === 0) return;
+
+        // Sort sessions by date (newest first)
+        const sortedSessions = [...data].sort((a, b) =>
+            new Date(b.date).getTime() - new Date(a.date).getTime()
+        );
+
+        // Calculate total workouts
+        const totalWorkouts = sortedSessions.length;
+
+        // Calculate calories burned across all sessions
+        // Using a basic MET value of 4 for moderate intensity exercise
+        // Calories = MET × weight in kg × duration in hours
+        // Assuming 70kg person as default
+        const totalCalories = sortedSessions.reduce((sum, session) => {
+            const MET = 4;
+            const weightKg = 70;
+            const durationHours = session.duration_minutes / 60;
+            return sum + Math.round(MET * weightKg * durationHours);
+        }, 0);
+
+        // Calculate workout streak (consecutive days)
+        const streakData = calculateStreak(sortedSessions);
+
+        // Calculate goal completion (based on weekly goal of 3 workouts)
+        // Get current week's workouts
+        const today = new Date();
+        const startOfWeek = new Date(today);
+        startOfWeek.setDate(today.getDate() - today.getDay()); // Sunday as start of week
+        startOfWeek.setHours(0, 0, 0, 0);
+
+        const thisWeekWorkouts = sortedSessions.filter(session => 
+            new Date(session.date) >= startOfWeek
+        );
+
+        // Calculate progress toward weekly goal (3 workouts per week)
+        const weeklyGoal = 3;
+        const goalCompletion = Math.min(100, Math.round((thisWeekWorkouts.length / weeklyGoal) * 100));
+
+        setTotalStats({
+            totalWorkouts,
+            currentStreak: streakData.currentStreak,
+            caloriesBurned: totalCalories,
+            goalCompletion
+        });
+    };
+
+    // Calculate current workout streak
+    const calculateStreak = (sessions: WorkoutSession[]) => {
+        // Sort sessions by date (oldest first)
+        const sortedDates = [...sessions]
+            .map(session => new Date(session.date).toISOString().split('T')[0])
+            .sort();
+
+        let currentStreak = 0;
+        let bestStreak = 0;
+        let tempStreak = 0;
+
+        // Get today's date in ISO format (YYYY-MM-DD)
+        const today = new Date().toISOString().split('T')[0];
+
+        // Check if the most recent workout was today or yesterday to maintain streak
+        if (sortedDates.length > 0) {
+            const lastWorkoutDate = new Date(sortedDates[sortedDates.length - 1]);
+            const yesterdayDate = new Date();
+            yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+            const yesterday = yesterdayDate.toISOString().split('T')[0];
+
+            const isActiveStreak = sortedDates[sortedDates.length - 1] === today ||
+                sortedDates[sortedDates.length - 1] === yesterday;
+
+            // Calculate the current streak
+            if (isActiveStreak) {
+                currentStreak = 1; // Start with 1 for the most recent day
+
+                // Go backwards through the sorted dates
+                for (let i = sortedDates.length - 2; i >= 0; i--) {
+                    const currentDate = new Date(sortedDates[i + 1]);
+                    const prevDate = new Date(sortedDates[i]);
+
+                    // Check if dates are consecutive
+                    const diffTime = currentDate.getTime() - prevDate.getTime();
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                    if (diffDays === 1) {
+                        currentStreak++;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Calculate best streak
+        for (let i = 0; i < sortedDates.length; i++) {
+            if (i === 0) {
+                tempStreak = 1;
+            } else {
+                const currentDate = new Date(sortedDates[i]);
+                const prevDate = new Date(sortedDates[i - 1]);
+
+                const diffTime = currentDate.getTime() - prevDate.getTime();
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                if (diffDays === 1) {
+                    tempStreak++;
+                } else {
+                    tempStreak = 1;
+                }
+            }
+
+            if (tempStreak > bestStreak) {
+                bestStreak = tempStreak;
+            }
+        }
+
+        return { currentStreak, bestStreak };
+    };
+
+    // Enhanced Chat Submit Handler with User Profile Data
     const handleChatSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (chatMessage.trim() === "" || isLoading) return;
@@ -96,7 +345,27 @@ export default function HomePage() {
         setIsLoading(true);
 
         try {
-            // Call the Gemini API route with the workouts data
+            // Prepare user profile data to send to the API
+            // This includes relevant fitness data for personalized recommendations
+            const userProfileData = {
+                name: user?.name || "User",
+                email: user?.email || "",
+                fitnessLevel: user?.fitnessLevel || "beginner",
+                fitnessGoals: user?.fitnessGoals || [],
+                equipment: user?.equipment || [],
+                height: user?.height || "",
+                weight: user?.weight || "",
+                age: user?.age || "",
+                workoutDuration: user?.workoutDuration || "",
+                workoutFrequency: user?.workoutFrequency || "",
+                workoutStats: {
+                    totalWorkouts: totalStats.totalWorkouts,
+                    currentStreak: totalStats.currentStreak,
+                    caloriesBurned: totalStats.caloriesBurned
+                }
+            };
+
+            // Call the Gemini API route with the workouts data and user profile
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: {
@@ -104,7 +373,8 @@ export default function HomePage() {
                 },
                 body: JSON.stringify({
                     userMessage: message,
-                    workouts: workouts as Workout[]  // Pass the workouts to the API with type
+                    workouts: workouts as Workout[],
+                    userProfile: userProfileData
                 }),
             });
 
@@ -276,34 +546,38 @@ export default function HomePage() {
                             )}
                         </div>
 
-                        {/* Chat Input Area */}
-                        <form onSubmit={handleChatSubmit} className="flex">
-                            <input
-                                type="text"
-                                className="flex-grow bg-gray-700 rounded-l-md p-3 focus:outline-none focus:ring-2 focus:ring-purple-500 border-transparent"
-                                placeholder="Ask about recommended workouts..."
-                                value={chatMessage}
-                                onChange={(e) => setChatMessage(e.target.value)}
-                                disabled={isLoading}
-                            />
-                            <button
-                                type="submit"
-                                className={`bg-gradient-to-r from-purple-500 to-blue-600 px-5 py-3 rounded-r-md transition-colors font-medium ${isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:from-purple-600 hover:to-blue-700'
-                                    }`}
-                                disabled={isLoading}
-                            >
-                                {isLoading ? "Sending..." : "Send"}
-                            </button>
+                        {/* Chat Input Area with Suggested Prompts */}
+                        <form onSubmit={handleChatSubmit} className="flex flex-col">
+                            <SuggestedPrompts onSelectPrompt={(prompt) => setChatMessage(prompt)} />
+                            <div className="flex">
+                                <input
+                                    type="text"
+                                    className="flex-grow bg-gray-700 rounded-l-md p-3 focus:outline-none focus:ring-2 focus:ring-purple-500 border-transparent"
+                                    placeholder="Ask about recommended workouts..."
+                                    value={chatMessage}
+                                    onChange={(e) => setChatMessage(e.target.value)}
+                                    disabled={isLoading}
+                                />
+                                <button
+                                    type="submit"
+                                    className={`bg-gradient-to-r from-purple-500 to-blue-600 px-5 py-3 rounded-r-md transition-colors font-medium ${isLoading ? 'opacity-70 cursor-not-allowed' : 'hover:from-purple-600 hover:to-blue-700'
+                                        }`}
+                                    disabled={isLoading}
+                                >
+                                    {isLoading ? "Sending..." : "Send"}
+                                </button>
+                            </div>
                         </form>
                     </div>
 
-                    {/* Rest of your existing component... */}
+                    {/* Updated Stats Cards */}
                     <div className="grid grid-cols-3 gap-4 mb-6">
+                        {/* Weekly Goal Card */}
                         <div className="bg-gray-800 bg-opacity-75 rounded-xl p-4 border border-gray-700 shadow-md">
                             <div className="flex justify-between items-start">
                                 <div>
-                                    <p className="text-gray-400 text-xs">Today's Goal</p>
-                                    <h3 className="text-lg font-bold mt-1 text-white">85% Complete</h3>
+                                    <p className="text-gray-400 text-xs">Weekly Goal</p>
+                                    <h3 className="text-lg font-bold mt-1 text-white">{statsLoading ? "Loading..." : `${totalStats.goalCompletion}% Complete`}</h3>
                                 </div>
                                 <div className="p-2 bg-indigo-900/30 rounded-lg">
                                     <svg className="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -311,13 +585,24 @@ export default function HomePage() {
                                     </svg>
                                 </div>
                             </div>
+                            {!statsLoading && (
+                                <div className="mt-2 w-full bg-gray-700 rounded-full h-1.5">
+                                    <div 
+                                        className="h-1.5 rounded-full bg-indigo-500" 
+                                        style={{ width: `${totalStats.goalCompletion}%` }}
+                                    ></div>
+                                </div>
+                            )}
                         </div>
 
+                        {/* Current Streak Card */}
                         <div className="bg-gray-800 bg-opacity-75 rounded-xl p-4 border border-gray-700 shadow-md">
                             <div className="flex justify-between items-start">
                                 <div>
                                     <p className="text-gray-400 text-xs">Current Streak</p>
-                                    <h3 className="text-lg font-bold mt-1 text-white">3 Days</h3>
+                                    <h3 className="text-lg font-bold mt-1 text-white">
+                                        {statsLoading ? "Loading..." : `${totalStats.currentStreak} Days`}
+                                    </h3>
                                 </div>
                                 <div className="p-2 bg-purple-900/30 rounded-lg">
                                     <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -325,13 +610,21 @@ export default function HomePage() {
                                     </svg>
                                 </div>
                             </div>
+                            <div className="mt-2 text-xs text-gray-400">
+                                {!statsLoading && (
+                                    <span>Keep it up! {totalStats.currentStreak > 0 ? "You're on fire!" : "Start your streak today!"}</span>
+                                )}
+                            </div>
                         </div>
 
+                        {/* Calories Burned Card */}
                         <div className="bg-gray-800 bg-opacity-75 rounded-xl p-4 border border-gray-700 shadow-md">
                             <div className="flex justify-between items-start">
                                 <div>
                                     <p className="text-gray-400 text-xs">Calories Burned</p>
-                                    <h3 className="text-lg font-bold mt-1 text-white">267 kcal</h3>
+                                    <h3 className="text-lg font-bold mt-1 text-white">
+                                        {statsLoading ? "Loading..." : `${totalStats.caloriesBurned} kcal`}
+                                    </h3>
                                 </div>
                                 <div className="p-2 bg-pink-900/30 rounded-lg">
                                     <svg className="w-4 h-4 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -339,6 +632,11 @@ export default function HomePage() {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
                                     </svg>
                                 </div>
+                            </div>
+                            <div className="mt-2 text-xs text-gray-400">
+                                {!statsLoading && (
+                                    <span>Total from {totalStats.totalWorkouts} workouts</span>
+                                )}
                             </div>
                         </div>
                     </div>

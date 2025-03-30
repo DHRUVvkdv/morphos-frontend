@@ -11,6 +11,25 @@ interface Workout {
   equipment: string;
 }
 
+// Define user profile type
+interface UserProfile {
+  name: string;
+  email: string;
+  fitnessLevel?: string;
+  fitnessGoals?: string[];
+  equipment?: string[];
+  height?: string;
+  weight?: string;
+  age?: string;
+  workoutDuration?: string;
+  workoutFrequency?: string;
+  workoutStats?: {
+    totalWorkouts: number;
+    currentStreak: number;
+    caloriesBurned: number;
+  };
+}
+
 export async function POST(request: Request) {
   try {
     // Check if API key exists
@@ -27,32 +46,49 @@ export async function POST(request: Request) {
     // Initialize the Google Generative AI SDK
     const genAI = new GoogleGenerativeAI(apiKey);
     
-    const { userMessage, workouts } = await request.json() as { 
+    const { userMessage, workouts, userProfile } = await request.json() as { 
       userMessage: string; 
-      workouts: Workout[] 
+      workouts: Workout[];
+      userProfile: UserProfile; 
     };
     
-    // Create a system prompt that includes the available workouts
+    // Create a system prompt that includes the available workouts and user profile
     const systemPrompt = `
-    You are a helpful fitness assistant for the Morphos app. Your task is to recommend workouts based on the user's query. Keep your response concise.
+    You are a helpful fitness assistant for the Morphos app. Your task is to recommend workouts based on the user's query, taking into account their fitness profile. Keep your response concise.
     
     Available workouts:
     ${workouts.map((workout: Workout) => 
       `- ${workout.name}: ${workout.description}. Difficulty: ${workout.difficulty}. Equipment: ${workout.equipment}`
     ).join('\n')}
     
+    User's profile information:
+    - Name: ${userProfile.name}
+    - Fitness level: ${userProfile.fitnessLevel || 'Not specified'}
+    - Age: ${userProfile.age || 'Not specified'}
+    - Weight: ${userProfile.weight ? userProfile.weight + ' kg' : 'Not specified'}
+    - Height: ${userProfile.height ? userProfile.height + ' cm' : 'Not specified'}
+    - Fitness goals: ${userProfile.fitnessGoals?.join(', ') || 'Not specified'}
+    - Available equipment: ${userProfile.equipment?.join(', ') || 'None'}
+    - Preferred workout duration: ${userProfile.workoutDuration ? userProfile.workoutDuration + ' minutes' : 'Not specified'}
+    - Workout frequency: ${userProfile.workoutFrequency ? userProfile.workoutFrequency + ' times per week' : 'Not specified'}
+    - Current workout streak: ${userProfile.workoutStats?.currentStreak || 0} days
+    - Total workouts completed: ${userProfile.workoutStats?.totalWorkouts || 0}
+    - Total calories burned: ${userProfile.workoutStats?.caloriesBurned || 0}
+    
     When recommending workouts:
     1. Focus on the workouts from the available list
-    2. Consider the user's equipment and fitness level if mentioned
-    3. Explain why you're recommending specific exercises
-    4. Keep responses conversational and encouraging
-    5. If the user asks for something not in the list, recommend the closest match and explain why
-    6. You can use Markdown formatting in your responses:
+    2. Consider the user's equipment, fitness level, goals, and physical attributes
+    3. Personalize recommendations based on their profile (e.g., suggest appropriate weights, reps, or modifications)
+    4. For weight recommendations, use their fitness level and physical attributes as a guide
+    5. Explain why you're recommending specific exercises
+    6. Keep responses conversational and encouraging
+    7. If the user asks for something not in the list, recommend the closest match and explain why
+    8. You can use Markdown formatting in your responses:
        - **Bold** for exercise names and important points
        - *Italic* for emphasis
        - Bullet points for lists
     
-    Now, respond to the user's message.
+    Now, respond to the user's message. Be specific and personalized when giving recommendations about weights, repetitions, or exercise variations based on their profile.
     `;
     
     // Generate content with Gemini
@@ -63,7 +99,7 @@ export async function POST(request: Request) {
       const result = await model.generateContent({
         contents: [
           { role: "user", parts: [{ text: systemPrompt }] },
-          { role: "model", parts: [{ text: "I understand. I'll help recommend workouts from the available options." }] },
+          { role: "model", parts: [{ text: "I understand. I'll help recommend personalized workouts based on the available options and user profile." }] },
           { role: "user", parts: [{ text: userMessage }] }
         ],
         generationConfig: {
@@ -86,7 +122,7 @@ export async function POST(request: Request) {
         const fallbackResult = await fallbackModel.generateContent({
           contents: [
             { role: "user", parts: [{ text: systemPrompt }] },
-            { role: "model", parts: [{ text: "I understand. I'll help recommend workouts from the available options." }] },
+            { role: "model", parts: [{ text: "I understand. I'll help recommend personalized workouts based on the available options and user profile." }] },
             { role: "user", parts: [{ text: userMessage }] }
           ],
           generationConfig: {
