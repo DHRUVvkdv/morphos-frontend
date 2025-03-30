@@ -220,6 +220,9 @@ const FitnessCoach: React.FC = () => {
   const [showMusicPanel, setShowMusicPanel] = useState<boolean>(false);
   const [currentPlayingTrack, setCurrentPlayingTrack] = useState<string | null>(null);
 
+  const [isRefreshingMusic, setIsRefreshingMusic] = useState<boolean>(false);
+  const [lastRefreshTime, setLastRefreshTime] = useState<number>(0);
+
   const searchParams = useSearchParams() || new URLSearchParams();
 
   const mapExerciseIdToMode = (exerciseId: string | null): string => {
@@ -1234,261 +1237,336 @@ const FitnessCoach: React.FC = () => {
   };
   
   // Draw skeleton on canvas overlay
-  useEffect(() => {
-    if (!poseData || !poseData.keypoints || poseData.keypoints.length === 0) return;
+  // Draw skeleton on canvas overlay
+useEffect(() => {
+  if (!poseData || !poseData.keypoints || poseData.keypoints.length === 0) return;
+  
+  const drawSkeleton = () => {
+    const overlayCanvas = document.getElementById('skeleton-overlay') as HTMLCanvasElement;
+    if (!overlayCanvas || !videoRef.current || !poseData || !poseData.keypoints || poseData.keypoints.length === 0) return;
     
-    const drawSkeleton = () => {
-      const overlayCanvas = document.getElementById('skeleton-overlay') as HTMLCanvasElement;
-      if (!overlayCanvas || !videoRef.current || !poseData || !poseData.keypoints || poseData.keypoints.length === 0) return;
+    const ctx = overlayCanvas.getContext('2d');
+    if (!ctx) return;
+    
+    // Get the actual video dimensions and display dimensions
+    const videoWidth = videoRef.current.videoWidth;
+    const videoHeight = videoRef.current.videoHeight;
+    const videoBounds = videoRef.current.getBoundingClientRect();
+    
+    // Set canvas to match video container dimensions
+    overlayCanvas.width = videoBounds.width;
+    overlayCanvas.height = videoBounds.height;
+    
+    // Clear previous drawings
+    ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+    
+    // Keypoint indices for reference
+    const LEFT_SHOULDER = 5;
+    const RIGHT_SHOULDER = 6;
+    const LEFT_ELBOW = 7;
+    const RIGHT_ELBOW = 8;
+    const LEFT_WRIST = 9;
+    const RIGHT_WRIST = 10;
+    const LEFT_HIP = 11;
+    const RIGHT_HIP = 12;
+    const LEFT_KNEE = 13;
+    const RIGHT_KNEE = 14;
+    const LEFT_ANKLE = 15;
+    const RIGHT_ANKLE = 16;
+    
+    // Define required keypoints based on exercise mode
+    let requiredKeypoints: number[] = [];
+    const mode = poseData.exercise_mode;
+    
+    if (mode === 'tpose') {
+      // For T-Pose, we need shoulders, elbows, wrists, and hips
+      requiredKeypoints = [
+        LEFT_SHOULDER, RIGHT_SHOULDER, 
+        LEFT_ELBOW, RIGHT_ELBOW, 
+        LEFT_WRIST, RIGHT_WRIST,
+        LEFT_HIP, RIGHT_HIP
+      ];
+    } else if (mode === 'bicep_curl') {
+      // For Bicep Curl, we need shoulders, elbows, wrists, and hips
+      requiredKeypoints = [
+        LEFT_SHOULDER, RIGHT_SHOULDER, 
+        LEFT_ELBOW, RIGHT_ELBOW, 
+        LEFT_WRIST, RIGHT_WRIST,
+        LEFT_HIP, RIGHT_HIP
+      ];
+    } else if (mode === 'squat') {
+      // For Squat, we need shoulders, hips, knees, and ankles
+      requiredKeypoints = [
+        LEFT_SHOULDER, RIGHT_SHOULDER,
+        LEFT_HIP, RIGHT_HIP,
+        LEFT_KNEE, RIGHT_KNEE,
+        LEFT_ANKLE, RIGHT_ANKLE
+      ];
+    } else if (mode === 'lateral_raise') {
+      // For Lateral Raise, we need shoulders, elbows, wrists, and hips
+      requiredKeypoints = [
+        LEFT_SHOULDER, RIGHT_SHOULDER, 
+        LEFT_ELBOW, RIGHT_ELBOW, 
+        LEFT_WRIST, RIGHT_WRIST,
+        LEFT_HIP, RIGHT_HIP
+      ];
+    } else if (mode === 'plank') {
+      // For Plank, we need all points for proper alignment
+      requiredKeypoints = [
+        LEFT_SHOULDER, RIGHT_SHOULDER,
+        LEFT_ELBOW, RIGHT_ELBOW,
+        LEFT_HIP, RIGHT_HIP,
+        LEFT_KNEE, RIGHT_KNEE,
+        LEFT_ANKLE, RIGHT_ANKLE
+      ];
+    }
+    
+    // Check if all required keypoints are valid
+    const areAllKeypointsValid = requiredKeypoints.every(index => {
+      // Check if keypoint exists and is not null/undefined
+      if (!poseData.keypoints[index] || poseData.keypoints[index].length < 2) {
+        return false;
+      }
       
-      const ctx = overlayCanvas.getContext('2d');
-      if (!ctx) return;
-      
-      // Get the actual video dimensions and display dimensions
-      const videoWidth = videoRef.current.videoWidth;
-      const videoHeight = videoRef.current.videoHeight;
-      const videoBounds = videoRef.current.getBoundingClientRect();
-      
-      // Set canvas to match video container dimensions
-      overlayCanvas.width = videoBounds.width;
-      overlayCanvas.height = videoBounds.height;
-      
-      // Clear previous drawings
+      // Check if the keypoint coordinates are valid numbers
+      const [x, y] = poseData.keypoints[index];
+      return (
+        typeof x === 'number' && 
+        typeof y === 'number' && 
+        !isNaN(x) && 
+        !isNaN(y) && 
+        x > 0 && 
+        y > 0
+      );
+    });
+    
+    // Only proceed with drawing if all required keypoints are valid
+    if (!areAllKeypointsValid) {
+      // If keypoints are missing, clear the canvas and return
       ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+      return;
+    }
+    
+    // Get the actual display aspect ratio and video aspect ratio
+    const displayAspect = videoBounds.width / videoBounds.height;
+    const videoAspect = videoWidth / videoHeight;
+    
+    // Calculate the visible dimensions within the container
+    let displayWidth, displayHeight, offsetX = 0, offsetY = 0;
+    
+    if (displayAspect > videoAspect) {
+      // Container is wider than video - video is height-constrained
+      displayHeight = videoBounds.height;
+      displayWidth = displayHeight * videoAspect;
+      offsetX = (videoBounds.width - displayWidth) / 2; // Center horizontally
+    } else {
+      // Container is taller than video - video is width-constrained
+      displayWidth = videoBounds.width;
+      displayHeight = displayWidth / videoAspect;
+      offsetY = (videoBounds.height - displayHeight) / 2; // Center vertically
+    }
+    
+    // Calculate scaling ratios from 50% scaled keypoints to displayed size
+    const scaleX = displayWidth / (videoWidth * 0.5);
+    const scaleY = displayHeight / (videoHeight * 0.5);
+    
+    // Transform keypoints to match display coordinates with mirroring
+    const transformedKeypoints = poseData.keypoints.map(point => {
+      if (!point || point.length < 2) return [0, 0];
       
-      // Get the actual display aspect ratio and video aspect ratio
-      const displayAspect = videoBounds.width / videoBounds.height;
-      const videoAspect = videoWidth / videoHeight;
+      // Flip the X coordinate to match the mirrored video display
+      // We mirror around the center of the display width
+      const mirroredX = videoBounds.width - (point[0] * scaleX + offsetX);
       
-      // Calculate the visible dimensions within the container
-      let displayWidth, displayHeight, offsetX = 0, offsetY = 0;
+      return [
+        mirroredX,
+        point[1] * scaleY + offsetY
+      ];
+    });
+    
+    // Draw connections between keypoints
+    const drawConnection = (p1Idx: number, p2Idx: number, color: string, thickness: number) => {
+      if (p1Idx >= transformedKeypoints.length || p2Idx >= transformedKeypoints.length) return;
       
-      if (displayAspect > videoAspect) {
-        // Container is wider than video - video is height-constrained
-        displayHeight = videoBounds.height;
-        displayWidth = displayHeight * videoAspect;
-        offsetX = (videoBounds.width - displayWidth) / 2; // Center horizontally
-      } else {
-        // Container is taller than video - video is width-constrained
-        displayWidth = videoBounds.width;
-        displayHeight = displayWidth / videoAspect;
-        offsetY = (videoBounds.height - displayHeight) / 2; // Center vertically
-      }
+      const p1 = transformedKeypoints[p1Idx];
+      const p2 = transformedKeypoints[p2Idx];
       
-      // Calculate scaling ratios from 50% scaled keypoints to displayed size
-      const scaleX = displayWidth / (videoWidth * 0.5);
-      const scaleY = displayHeight / (videoHeight * 0.5);
+      // Draw glow effect
+      ctx.lineWidth = thickness + 4;
+      ctx.strokeStyle = COLORS.shadow;
+      ctx.beginPath();
+      ctx.moveTo(p1[0], p1[1]);
+      ctx.lineTo(p2[0], p2[1]);
+      ctx.stroke();
       
-      // Transform keypoints to match display coordinates with mirroring
-      const transformedKeypoints = poseData.keypoints.map(point => {
-        if (!point || point.length < 2) return [0, 0];
-        
-        // Flip the X coordinate to match the mirrored video display
-        // We mirror around the center of the display width
-        const mirroredX = videoBounds.width - (point[0] * scaleX + offsetX);
-        
-        return [
-          mirroredX,
-          point[1] * scaleY + offsetY
-        ];
-      });
-      
-      // Draw connections between keypoints
-      const drawConnection = (p1Idx: number, p2Idx: number, color: string, thickness: number) => {
-        if (p1Idx >= transformedKeypoints.length || p2Idx >= transformedKeypoints.length) return;
-        
-        const p1 = transformedKeypoints[p1Idx];
-        const p2 = transformedKeypoints[p2Idx];
-        
-        // Draw glow effect
-        ctx.lineWidth = thickness + 4;
-        ctx.strokeStyle = COLORS.shadow;
-        ctx.beginPath();
-        ctx.moveTo(p1[0], p1[1]);
-        ctx.lineTo(p2[0], p2[1]);
-        ctx.stroke();
-        
-        // Draw main line
-        ctx.lineWidth = thickness;
-        ctx.strokeStyle = color;
-        ctx.beginPath();
-        ctx.moveTo(p1[0], p1[1]);
-        ctx.lineTo(p2[0], p2[1]);
-        ctx.stroke();
-      };
-      
-      // Keypoint indices
-      const LEFT_SHOULDER = 5;
-      const RIGHT_SHOULDER = 6;
-      const LEFT_ELBOW = 7;
-      const RIGHT_ELBOW = 8;
-      const LEFT_WRIST = 9;
-      const RIGHT_WRIST = 10;
-      const LEFT_HIP = 11;
-      const RIGHT_HIP = 12;
-      const LEFT_KNEE = 13;
-      const RIGHT_KNEE = 14;
-      const LEFT_ANKLE = 15;
-      const RIGHT_ANKLE = 16;
-      
-      // Draw skeleton based on exercise mode
-      const feedback = poseData.feedback;
-      const mode = poseData.exercise_mode;
-      
-      if (mode === 'tpose' && isTPoseFeedback(feedback)) {
-        // Draw arms
-        const leftArmColor = feedback.left_arm.correct ? COLORS.correct : COLORS.incorrect;
-        const rightArmColor = feedback.right_arm.correct ? COLORS.correct : COLORS.incorrect;
-        
-        drawConnection(LEFT_SHOULDER, LEFT_ELBOW, leftArmColor, 3);
-        drawConnection(LEFT_ELBOW, LEFT_WRIST, leftArmColor, 3);
-        drawConnection(RIGHT_SHOULDER, RIGHT_ELBOW, rightArmColor, 3);
-        drawConnection(RIGHT_ELBOW, RIGHT_WRIST, rightArmColor, 3);
-        
-        // Draw posture
-        const postureColor = feedback.posture.correct ? COLORS.correct : COLORS.incorrect;
-        drawConnection(LEFT_SHOULDER, RIGHT_SHOULDER, postureColor, 3);
-        drawConnection(LEFT_HIP, RIGHT_HIP, postureColor, 3);
-        drawConnection(LEFT_SHOULDER, LEFT_HIP, postureColor, 3);
-        drawConnection(RIGHT_SHOULDER, RIGHT_HIP, postureColor, 3);
-      
-      } else if (mode === 'bicep_curl' && isBicepCurlFeedback(feedback)) {
-        // For bicep curl mode
-        // Draw posture
-        const postureColor = feedback.posture.correct ? COLORS.correct : COLORS.incorrect;
-        drawConnection(LEFT_SHOULDER, RIGHT_SHOULDER, postureColor, 3);
-        drawConnection(LEFT_HIP, RIGHT_HIP, postureColor, 3);
-        drawConnection(LEFT_SHOULDER, LEFT_HIP, postureColor, 3);
-        drawConnection(RIGHT_SHOULDER, RIGHT_HIP, postureColor, 3);
-        
-        // Draw arms (highlight the curling arm)
-        const elbowColor = feedback.elbow_angle.correct ? COLORS.correct : COLORS.incorrect;
-        const armColor = feedback.arm_position.correct ? COLORS.correct : COLORS.incorrect;
-        
-        drawConnection(LEFT_SHOULDER, LEFT_ELBOW, armColor, 3);
-        drawConnection(LEFT_ELBOW, LEFT_WRIST, elbowColor, 3);
-        drawConnection(RIGHT_SHOULDER, RIGHT_ELBOW, armColor, 3);
-        drawConnection(RIGHT_ELBOW, RIGHT_WRIST, elbowColor, 3);
-      } else if (mode === 'squat' && isSquatFeedback(feedback)) {
-        // For squat mode
-        // Draw posture
-        const postureColor = feedback.posture.correct ? COLORS.correct : COLORS.incorrect;
-        drawConnection(LEFT_SHOULDER, RIGHT_SHOULDER, postureColor, 3);
-        drawConnection(LEFT_SHOULDER, LEFT_HIP, postureColor, 3);
-        drawConnection(RIGHT_SHOULDER, RIGHT_HIP, postureColor, 3);
-        
-        // Draw legs
-        const kneeColor = feedback.knee_angle.correct ? COLORS.correct : COLORS.incorrect;
-        const hipColor = feedback.hip_position.correct ? COLORS.correct : COLORS.incorrect;
-        
-        // Hip connections
-        drawConnection(LEFT_HIP, RIGHT_HIP, hipColor, 3);
-        
-        // Leg connections
-        drawConnection(LEFT_HIP, LEFT_KNEE, kneeColor, 3);
-        drawConnection(LEFT_KNEE, LEFT_ANKLE, kneeColor, 3);
-        drawConnection(RIGHT_HIP, RIGHT_KNEE, kneeColor, 3);
-        drawConnection(RIGHT_KNEE, RIGHT_ANKLE, kneeColor, 3);
-
-      } else if (mode === 'lateral_raise' && isLateralRaiseFeedback(feedback)) {
-        // For lateral raise mode
-        // Draw posture
-        const postureColor = feedback.posture.correct ? COLORS.correct : COLORS.incorrect;
-        drawConnection(LEFT_SHOULDER, RIGHT_SHOULDER, postureColor, 3);
-        drawConnection(LEFT_HIP, RIGHT_HIP, postureColor, 3);
-        drawConnection(LEFT_SHOULDER, LEFT_HIP, postureColor, 3);
-        drawConnection(RIGHT_SHOULDER, RIGHT_HIP, postureColor, 3);
-        
-        // Draw arms
-        const armColor = feedback.arm_angle.correct ? COLORS.correct : COLORS.incorrect;
-        const symmetryColor = feedback.arm_symmetry.correct ? COLORS.correct : COLORS.incorrect;
-        
-        // Color the connections based on symmetry
-        const leftArmColor = symmetryColor === COLORS.correct ? armColor : COLORS.incorrect;
-        const rightArmColor = symmetryColor === COLORS.correct ? armColor : COLORS.incorrect;
-        
-        drawConnection(LEFT_SHOULDER, LEFT_ELBOW, leftArmColor, 3);
-        drawConnection(LEFT_ELBOW, LEFT_WRIST, leftArmColor, 3);
-        drawConnection(RIGHT_SHOULDER, RIGHT_ELBOW, rightArmColor, 3);
-        drawConnection(RIGHT_ELBOW, RIGHT_WRIST, rightArmColor, 3);
-
-      } else if (mode === 'plank' && isPlankFeedback(feedback)) {
-        // For plank mode
-        // Draw body alignment (shoulder to ankle line)
-        const alignmentColor = feedback.body_alignment.correct ? COLORS.correct : COLORS.incorrect;
-        const hipColor = feedback.hip_position.correct ? COLORS.correct : COLORS.incorrect;
-        // const headColor = feedback.head_position.correct ? COLORS.correct : COLORS.incorrect;
-        
-        // Draw upper body
-        drawConnection(LEFT_SHOULDER, RIGHT_SHOULDER, alignmentColor, 3);
-        
-        // Draw body alignment line
-        drawConnection(LEFT_SHOULDER, LEFT_HIP, alignmentColor, 3);
-        drawConnection(RIGHT_SHOULDER, RIGHT_HIP, alignmentColor, 3);
-        
-        // Draw hips
-        drawConnection(LEFT_HIP, RIGHT_HIP, hipColor, 3);
-        
-        // Draw legs
-        drawConnection(LEFT_HIP, LEFT_KNEE, alignmentColor, 3);
-        drawConnection(LEFT_KNEE, LEFT_ANKLE, alignmentColor, 3);
-        drawConnection(RIGHT_HIP, RIGHT_KNEE, alignmentColor, 3);
-        drawConnection(RIGHT_KNEE, RIGHT_ANKLE, alignmentColor, 3);
-      }
-      
-      // Draw keypoints
-      transformedKeypoints.forEach((point, i) => {
-        // Determine joint color based on body part and exercise mode
-        let color = COLORS.neutral;
-        
-        if (mode === 'tpose' && isTPoseFeedback(feedback)) {
-          if (i === LEFT_SHOULDER || i === LEFT_ELBOW || i === LEFT_WRIST) {
-            color = feedback.left_arm.correct ? COLORS.correct : COLORS.incorrect;
-          } else if (i === RIGHT_SHOULDER || i === RIGHT_ELBOW || i === RIGHT_WRIST) {
-            color = feedback.right_arm.correct ? COLORS.correct : COLORS.incorrect;
-          } else if (i === LEFT_HIP || i === RIGHT_HIP) {
-            color = feedback.posture.correct ? COLORS.correct : COLORS.incorrect;
-          }
-        } else if (mode === 'bicep_curl' && isBicepCurlFeedback(feedback)) {
-          if (i === LEFT_ELBOW || i === RIGHT_ELBOW) {
-            color = feedback.elbow_angle.correct ? COLORS.highlight : COLORS.incorrect;
-          } else if (i === LEFT_SHOULDER || i === RIGHT_SHOULDER || 
-                    i === LEFT_WRIST || i === RIGHT_WRIST) {
-            color = feedback.arm_position.correct ? COLORS.correct : COLORS.incorrect;
-          } else if (i === LEFT_HIP || i === RIGHT_HIP) {
-            color = feedback.posture.correct ? COLORS.correct : COLORS.incorrect;
-          }
-        }
-        
-        // Draw joint with glow effect
-        const radius = 6;
-        ctx.beginPath();
-        ctx.arc(point[0], point[1], radius + 2, 0, 2 * Math.PI);
-        ctx.fillStyle = COLORS.shadow;
-        ctx.fill();
-        
-        // Draw joint
-        ctx.beginPath();
-        ctx.arc(point[0], point[1], radius, 0, 2 * Math.PI);
-        ctx.fillStyle = color;
-        ctx.fill();
-        
-        // Draw highlight
-        ctx.beginPath();
-        ctx.arc(point[0] - 1, point[1] - 1, radius / 2, 0, 2 * Math.PI);
-        
-        // Make highlight color lighter
-        const lighterColor = color === COLORS.correct ? 'rgb(150, 255, 150)' : 
-                            color === COLORS.incorrect ? 'rgb(255, 150, 150)' :
-                            color === COLORS.highlight ? 'rgb(255, 240, 150)' : 'rgb(220, 220, 220)';
-        
-        ctx.fillStyle = lighterColor;
-        ctx.fill();
-      });
+      // Draw main line
+      ctx.lineWidth = thickness;
+      ctx.strokeStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(p1[0], p1[1]);
+      ctx.lineTo(p2[0], p2[1]);
+      ctx.stroke();
     };
     
-    drawSkeleton();
-  }, [poseData]);
+    // Draw skeleton based on exercise mode
+    const feedback = poseData.feedback;
+    
+    if (mode === 'tpose' && isTPoseFeedback(feedback)) {
+      // Draw arms
+      const leftArmColor = feedback.left_arm.correct ? COLORS.correct : COLORS.incorrect;
+      const rightArmColor = feedback.right_arm.correct ? COLORS.correct : COLORS.incorrect;
+      
+      drawConnection(LEFT_SHOULDER, LEFT_ELBOW, leftArmColor, 3);
+      drawConnection(LEFT_ELBOW, LEFT_WRIST, leftArmColor, 3);
+      drawConnection(RIGHT_SHOULDER, RIGHT_ELBOW, rightArmColor, 3);
+      drawConnection(RIGHT_ELBOW, RIGHT_WRIST, rightArmColor, 3);
+      
+      // Draw posture
+      const postureColor = feedback.posture.correct ? COLORS.correct : COLORS.incorrect;
+      drawConnection(LEFT_SHOULDER, RIGHT_SHOULDER, postureColor, 3);
+      drawConnection(LEFT_HIP, RIGHT_HIP, postureColor, 3);
+      drawConnection(LEFT_SHOULDER, LEFT_HIP, postureColor, 3);
+      drawConnection(RIGHT_SHOULDER, RIGHT_HIP, postureColor, 3);
+    
+    } else if (mode === 'bicep_curl' && isBicepCurlFeedback(feedback)) {
+      // For bicep curl mode
+      // Draw posture
+      const postureColor = feedback.posture.correct ? COLORS.correct : COLORS.incorrect;
+      drawConnection(LEFT_SHOULDER, RIGHT_SHOULDER, postureColor, 3);
+      drawConnection(LEFT_HIP, RIGHT_HIP, postureColor, 3);
+      drawConnection(LEFT_SHOULDER, LEFT_HIP, postureColor, 3);
+      drawConnection(RIGHT_SHOULDER, RIGHT_HIP, postureColor, 3);
+      
+      // Draw arms (highlight the curling arm)
+      const elbowColor = feedback.elbow_angle.correct ? COLORS.correct : COLORS.incorrect;
+      const armColor = feedback.arm_position.correct ? COLORS.correct : COLORS.incorrect;
+      
+      drawConnection(LEFT_SHOULDER, LEFT_ELBOW, armColor, 3);
+      drawConnection(LEFT_ELBOW, LEFT_WRIST, elbowColor, 3);
+      drawConnection(RIGHT_SHOULDER, RIGHT_ELBOW, armColor, 3);
+      drawConnection(RIGHT_ELBOW, RIGHT_WRIST, elbowColor, 3);
+    } else if (mode === 'squat' && isSquatFeedback(feedback)) {
+      // For squat mode
+      // Draw posture
+      const postureColor = feedback.posture.correct ? COLORS.correct : COLORS.incorrect;
+      drawConnection(LEFT_SHOULDER, RIGHT_SHOULDER, postureColor, 3);
+      drawConnection(LEFT_SHOULDER, LEFT_HIP, postureColor, 3);
+      drawConnection(RIGHT_SHOULDER, RIGHT_HIP, postureColor, 3);
+      
+      // Draw legs
+      const kneeColor = feedback.knee_angle.correct ? COLORS.correct : COLORS.incorrect;
+      const hipColor = feedback.hip_position.correct ? COLORS.correct : COLORS.incorrect;
+      
+      // Hip connections
+      drawConnection(LEFT_HIP, RIGHT_HIP, hipColor, 3);
+      
+      // Leg connections
+      drawConnection(LEFT_HIP, LEFT_KNEE, kneeColor, 3);
+      drawConnection(LEFT_KNEE, LEFT_ANKLE, kneeColor, 3);
+      drawConnection(RIGHT_HIP, RIGHT_KNEE, kneeColor, 3);
+      drawConnection(RIGHT_KNEE, RIGHT_ANKLE, kneeColor, 3);
+
+    } else if (mode === 'lateral_raise' && isLateralRaiseFeedback(feedback)) {
+      // For lateral raise mode
+      // Draw posture
+      const postureColor = feedback.posture.correct ? COLORS.correct : COLORS.incorrect;
+      drawConnection(LEFT_SHOULDER, RIGHT_SHOULDER, postureColor, 3);
+      drawConnection(LEFT_HIP, RIGHT_HIP, postureColor, 3);
+      drawConnection(LEFT_SHOULDER, LEFT_HIP, postureColor, 3);
+      drawConnection(RIGHT_SHOULDER, RIGHT_HIP, postureColor, 3);
+      
+      // Draw arms
+      const armColor = feedback.arm_angle.correct ? COLORS.correct : COLORS.incorrect;
+      const symmetryColor = feedback.arm_symmetry.correct ? COLORS.correct : COLORS.incorrect;
+      
+      // Color the connections based on symmetry
+      const leftArmColor = symmetryColor === COLORS.correct ? armColor : COLORS.incorrect;
+      const rightArmColor = symmetryColor === COLORS.correct ? armColor : COLORS.incorrect;
+      
+      drawConnection(LEFT_SHOULDER, LEFT_ELBOW, leftArmColor, 3);
+      drawConnection(LEFT_ELBOW, LEFT_WRIST, leftArmColor, 3);
+      drawConnection(RIGHT_SHOULDER, RIGHT_ELBOW, rightArmColor, 3);
+      drawConnection(RIGHT_ELBOW, RIGHT_WRIST, rightArmColor, 3);
+
+    } else if (mode === 'plank' && isPlankFeedback(feedback)) {
+      // For plank mode
+      // Draw body alignment (shoulder to ankle line)
+      const alignmentColor = feedback.body_alignment.correct ? COLORS.correct : COLORS.incorrect;
+      const hipColor = feedback.hip_position.correct ? COLORS.correct : COLORS.incorrect;
+      
+      // Draw upper body
+      drawConnection(LEFT_SHOULDER, RIGHT_SHOULDER, alignmentColor, 3);
+      
+      // Draw body alignment line
+      drawConnection(LEFT_SHOULDER, LEFT_HIP, alignmentColor, 3);
+      drawConnection(RIGHT_SHOULDER, RIGHT_HIP, alignmentColor, 3);
+      
+      // Draw hips
+      drawConnection(LEFT_HIP, RIGHT_HIP, hipColor, 3);
+      
+      // Draw legs
+      drawConnection(LEFT_HIP, LEFT_KNEE, alignmentColor, 3);
+      drawConnection(LEFT_KNEE, LEFT_ANKLE, alignmentColor, 3);
+      drawConnection(RIGHT_HIP, RIGHT_KNEE, alignmentColor, 3);
+      drawConnection(RIGHT_KNEE, RIGHT_ANKLE, alignmentColor, 3);
+    }
+    
+    // Draw keypoints
+    transformedKeypoints.forEach((point, i) => {
+      // Only draw keypoints that are part of the required set
+      if (!requiredKeypoints.includes(i)) return;
+      
+      // Determine joint color based on body part and exercise mode
+      let color = COLORS.neutral;
+      
+      if (mode === 'tpose' && isTPoseFeedback(feedback)) {
+        if (i === LEFT_SHOULDER || i === LEFT_ELBOW || i === LEFT_WRIST) {
+          color = feedback.left_arm.correct ? COLORS.correct : COLORS.incorrect;
+        } else if (i === RIGHT_SHOULDER || i === RIGHT_ELBOW || i === RIGHT_WRIST) {
+          color = feedback.right_arm.correct ? COLORS.correct : COLORS.incorrect;
+        } else if (i === LEFT_HIP || i === RIGHT_HIP) {
+          color = feedback.posture.correct ? COLORS.correct : COLORS.incorrect;
+        }
+      } else if (mode === 'bicep_curl' && isBicepCurlFeedback(feedback)) {
+        if (i === LEFT_ELBOW || i === RIGHT_ELBOW) {
+          color = feedback.elbow_angle.correct ? COLORS.highlight : COLORS.incorrect;
+        } else if (i === LEFT_SHOULDER || i === RIGHT_SHOULDER || 
+                  i === LEFT_WRIST || i === RIGHT_WRIST) {
+          color = feedback.arm_position.correct ? COLORS.correct : COLORS.incorrect;
+        } else if (i === LEFT_HIP || i === RIGHT_HIP) {
+          color = feedback.posture.correct ? COLORS.correct : COLORS.incorrect;
+        }
+      }
+      
+      // Draw joint with glow effect
+      const radius = 6;
+      ctx.beginPath();
+      ctx.arc(point[0], point[1], radius + 2, 0, 2 * Math.PI);
+      ctx.fillStyle = COLORS.shadow;
+      ctx.fill();
+      
+      // Draw joint
+      ctx.beginPath();
+      ctx.arc(point[0], point[1], radius, 0, 2 * Math.PI);
+      ctx.fillStyle = color;
+      ctx.fill();
+      
+      // Draw highlight
+      ctx.beginPath();
+      ctx.arc(point[0] - 1, point[1] - 1, radius / 2, 0, 2 * Math.PI);
+      
+      // Make highlight color lighter
+      const lighterColor = color === COLORS.correct ? 'rgb(150, 255, 150)' : 
+                          color === COLORS.incorrect ? 'rgb(255, 150, 150)' :
+                          color === COLORS.highlight ? 'rgb(255, 240, 150)' : 'rgb(220, 220, 220)';
+      
+      ctx.fillStyle = lighterColor;
+      ctx.fill();
+    });
+  };
+  
+  drawSkeleton();
+}, [poseData]);
   
   // Render progress bar component
   const ProgressBar: React.FC<{ value: number, color: string, label?: string }> = ({ value, color, label }) => {
@@ -1746,67 +1824,220 @@ const FitnessCoach: React.FC = () => {
     );
   };
 
+  const refreshMusicRecommendations = () => {
+    // Stop any currently playing audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+      setCurrentPlayingTrack(null);
+    }
+    
+    // Only request if connected to websocket
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      console.log('Requesting fresh music recommendations');
+      setIsRefreshingMusic(true);
+      
+      // Show loading state
+      setRecommendations([]);
+      
+      // Send explicit refresh_music command to server
+      wsRef.current.send(JSON.stringify({ 
+        command: 'get_recommendations', 
+        emotion: stableEmotion || currentEmotion || 'neutral',
+        limit: 6  // Request more tracks for variety
+      }));
+      
+      // Update last refresh time
+      setLastRefreshTime(Date.now());
+    }
+  };
+
+  useEffect(() => {
+    if (showMusicPanel) {
+      // If it's been at least 10 seconds since last refresh, or if we have no recommendations
+      const now = Date.now();
+      if (recommendations.length === 0 || now - lastRefreshTime > 10000) {
+        refreshMusicRecommendations();
+      }
+    }
+  }, [showMusicPanel]);
+
+  useEffect(() => {
+    // Only refresh if music panel is open, we have a stable emotion, and it's been a while
+    if (showMusicPanel && stableEmotion) {
+      const now = Date.now();
+      // Avoid too frequent refreshes (minimum 30 seconds between emotion-triggered refreshes)
+      if (now - lastRefreshTime > 30000) {
+        refreshMusicRecommendations();
+      }
+    }
+  }, [stableEmotion]);
+
   // Render music recommendations
   const renderMusicRecommendations = () => {
-    if (recommendations.length === 0) {
-      return (
-        <div className="text-center p-4">
-          <p className="text-gray-400">
-            {stableEmotion ? "No music recommendations available." : "Waiting for emotion detection..."}
-          </p>
-        </div>
-      );
-    }
-
     return (
-      <div className="space-y-3 max-h-60 overflow-y-auto p-1">
-        {recommendations.map((track) => (
-          <div key={track.id} className="flex bg-gray-700 p-2 rounded border-l-4 border-indigo-500">
-            {/* Album Art */}
-            <div className="w-12 h-12 flex-shrink-0 mr-3">
-              {track.image_url ? (
-                <img 
-                  src={track.image_url} 
-                  alt={`${track.album} cover`} 
-                  className="w-full h-full object-cover rounded"
-                />
-              ) : (
-                <div className="w-full h-full bg-gray-600 rounded flex items-center justify-center">
-                  <span className="text-gray-400 text-xs">No Image</span>
-                </div>
-              )}
+      <div className="space-y-4">
+        <div className="flex justify-between items-center mb-3">
+          <div className="flex items-center space-x-2">
+            <h3 className="text-lg font-bold">Music For Your Workout</h3>
+            {stableEmotion && (
+              <div 
+                className="inline-flex items-center space-x-1 px-2 py-1 rounded text-sm"
+                style={{ backgroundColor: `${getEmotionColor(stableEmotion)}30` }}
+              >
+                <span className="text-lg" role="img" aria-label={stableEmotion}>
+                  {getEmotionEmoji(stableEmotion)}
+                </span>
+                <span>{formatEmotion(stableEmotion)}</span>
+              </div>
+            )}
+          </div>
+          
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={refreshMusicRecommendations}
+              className="flex items-center space-x-1 px-2 py-1 rounded bg-indigo-700 hover:bg-indigo-600 text-xs transition-colors"
+              title="Get new recommendations based on current mood"
+            >
+              <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Refresh
+            </button>
+            
+            <div className="flex items-center">
+              <svg className="h-4 w-4 text-green-500 mr-1" viewBox="0 0 168 168" xmlns="http://www.w3.org/2000/svg">
+                <path fill="currentColor" d="M83.996 0C37.747 0 0 37.747 0 84c0 46.251 37.747 84 83.996 84 46.254 0 84.004-37.749 84.004-84 0-46.253-37.75-84-84.004-84zm38.447 121.113c-1.5 2.461-4.7 3.24-7.16 1.74-19.647-11.997-44.374-14.703-73.452-8.047-2.809.644-5.609-1.117-6.249-3.925-.643-2.809 1.11-5.609 3.926-6.249 31.901-7.288 59.263-4.154 81.337 9.334 2.46 1.5 3.24 4.701 1.738 7.161v-.004z"/>
+              </svg>
+              <span className="text-xs text-gray-400">Spotify</span>
             </div>
             
-            {/* Track Info */}
-            <div className="flex-1 min-w-0">
-              <div className="font-bold text-sm mb-1 truncate">{track.title}</div>
-              <div className="text-gray-300 text-xs truncate mb-1">{track.artist}</div>
-              
-              {/* Action Buttons */}
-              <div className="flex space-x-2">
-                {track.preview_url && (
-                  <button 
-                    onClick={() => playPreview(track)}
-                    className={`text-xs py-0.5 px-2 rounded ${
-                      currentPlayingTrack === track.id
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-indigo-900 text-indigo-300'
-                    }`}
-                  >
-                    {currentPlayingTrack === track.id ? 'Playing' : 'Play'}
-                  </button>
-                )}
-                
-                <button 
-                  onClick={() => openSpotifyLink(track.external_url)}
-                  className="text-xs py-0.5 px-2 rounded bg-green-900 text-green-300"
-                >
-                  Spotify
-                </button>
+            <button
+              onClick={toggleMusicPanel}
+              className="px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-xs transition-colors"
+            >
+              Hide
+            </button>
+          </div>
+        </div>
+        
+        {recommendations.length === 0 ? (
+          <div className="flex items-center justify-center h-32">
+            <div className="text-center">
+              <div className="inline-flex items-center justify-center w-10 h-10 mb-3">
+                <svg className="animate-spin w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
               </div>
+              <p className="text-gray-400">
+                {stableEmotion ? "Finding music for your mood..." : "Waiting for emotion detection..."}
+              </p>
             </div>
           </div>
-        ))}
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-60 overflow-y-auto p-2">
+            {recommendations.slice(0, 3).map((track) => (
+              <div 
+                key={track.id} 
+                className="flex bg-gray-700 rounded overflow-hidden border border-gray-600 hover:border-indigo-400 hover:bg-gray-600 transition-colors"
+              >
+                {/* Album Art - Made separately clickable */}
+                <div 
+                  className="w-16 h-16 flex-shrink-0 relative cursor-pointer"
+                  onClick={() => track.preview_url ? playPreview(track) : openSpotifyLink(track.external_url)}
+                >
+                  {track.image_url ? (
+                    <img 
+                      src={track.image_url} 
+                      alt={`${track.album} cover`} 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gray-600 flex items-center justify-center">
+                      <span className="text-gray-400 text-xs">No Image</span>
+                    </div>
+                  )}
+                  
+                  {/* Play overlay for album art */}
+                  <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
+                    {currentPlayingTrack === track.id ? (
+                      <div className="w-5 h-5 relative">
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-1.5 h-5 bg-white mx-0.5 animate-pulse"></div>
+                          <div className="w-1.5 h-3 bg-white mx-0.5 animate-pulse delay-100"></div>
+                          <div className="w-1.5 h-4 bg-white mx-0.5 animate-pulse delay-200"></div>
+                        </div>
+                      </div>
+                    ) : track.preview_url ? (
+                      <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-6 h-6 text-white" viewBox="0 0 168 168" xmlns="http://www.w3.org/2000/svg">
+                        <path fill="currentColor" d="M83.996 0C37.747 0 0 37.747 0 84c0 46.251 37.747 84 83.996 84 46.254 0 84.004-37.749 84.004-84 0-46.253-37.75-84-84.004-84zm38.447 121.113c-1.5 2.461-4.7 3.24-7.16 1.74-19.647-11.997-44.374-14.703-73.452-8.047-2.809.644-5.609-1.117-6.249-3.925-.643-2.809 1.11-5.609 3.926-6.249 31.901-7.288 59.263-4.154 81.337 9.334 2.46 1.5 3.24 4.701 1.738 7.161v-.004z"/>
+                      </svg>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Track Info - Made separately clickable */}
+                <div 
+                  className="flex-1 min-w-0 p-2 flex flex-col justify-between relative cursor-pointer"
+                  onClick={() => track.preview_url ? playPreview(track) : openSpotifyLink(track.external_url)}
+                >
+                  <div>
+                    <div className="font-medium text-sm truncate" title={track.title}>{track.title}</div>
+                    <div className="text-gray-300 text-xs truncate" title={track.artist}>{track.artist}</div>
+                  </div>
+                  
+                  {/* Controls */}
+                  <div className="flex items-center justify-between mt-1" onClick={(e) => e.stopPropagation()}>
+                    {/* Play/Pause Button */}
+                    {track.preview_url && (
+                      <button 
+                        onClick={() => playPreview(track)}
+                        className={`text-xs rounded-full w-7 h-7 flex items-center justify-center ${
+                          currentPlayingTrack === track.id
+                            ? 'bg-green-500 text-white'
+                            : 'bg-gray-800 hover:bg-gray-600 text-white'
+                        }`}
+                        title={currentPlayingTrack === track.id ? "Pause" : "Play preview"}
+                      >
+                        {currentPlayingTrack === track.id ? (
+                          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                          </svg>
+                        ) : (
+                          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z"/>
+                          </svg>
+                        )}
+                      </button>
+                    )}
+                    
+                    {/* Spotify Button */}
+                    <button 
+                      onClick={() => openSpotifyLink(track.external_url)}
+                      className="text-xs py-1 px-3 rounded bg-green-800 hover:bg-green-700 text-green-200 flex items-center"
+                      title="Open in Spotify"
+                    >
+                      <svg className="h-3 w-3 mr-1" viewBox="0 0 168 168" xmlns="http://www.w3.org/2000/svg">
+                        <path fill="currentColor" d="M83.996 0C37.747 0 0 37.747 0 84c0 46.251 37.747 84 83.996 84 46.254 0 84.004-37.749 84.004-84 0-46.253-37.75-84-84.004-84zm38.447 121.113c-1.5 2.461-4.7 3.24-7.16 1.74-19.647-11.997-44.374-14.703-73.452-8.047-2.809.644-5.609-1.117-6.249-3.925-.643-2.809 1.11-5.609 3.926-6.249 31.901-7.288 59.263-4.154 81.337 9.334 2.46 1.5 3.24 4.701 1.738 7.161v-.004z"/>
+                      </svg>
+                      Open
+                    </button>
+                  </div>
+                  
+                  {/* Playing indicator */}
+                  {currentPlayingTrack === track.id && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-500"></div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   };
@@ -1874,7 +2105,7 @@ const FitnessCoach: React.FC = () => {
   // Regular render when everything is initialized
   return (
     <div className="flex flex-col h-screen bg-gray-900 text-white">
-      {/* Main Content */}
+      {/* Top section with video and sidebar */}
       <div className="flex flex-col md:flex-row flex-1 p-4 overflow-hidden">
         {/* Camera View and Skeleton */}
         <div className="relative flex-1 flex items-center justify-center overflow-hidden bg-black rounded-lg">
@@ -1954,36 +2185,14 @@ const FitnessCoach: React.FC = () => {
         </div>
       </div>
       
-      {/* Music Recommendations Panel */}
+      {/* Music Recommendations Panel - with refresh functionality */}
       {showMusicPanel && (
         <div className="p-4 bg-gray-800 border-t border-gray-700">
-          <div className="flex justify-between items-center mb-2">
-            <div className="flex items-center space-x-2">
-              <h3 className="text-lg font-bold">Music Based on Your Mood</h3>
-              {stableEmotion && (
-                <div 
-                  className="inline-flex items-center space-x-1 px-2 py-1 rounded text-sm"
-                  style={{ backgroundColor: `${getEmotionColor(stableEmotion)}30` }}
-                >
-                  <span className="text-lg" role="img" aria-label={stableEmotion}>
-                    {getEmotionEmoji(stableEmotion)}
-                  </span>
-                  <span>{formatEmotion(stableEmotion)}</span>
-                </div>
-              )}
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <svg className="h-5 w-5 text-green-500" viewBox="0 0 168 168" xmlns="http://www.w3.org/2000/svg">
-                <path fill="currentColor" d="M83.996 0C37.747 0 0 37.747 0 84c0 46.251 37.747 84 83.996 84 46.254 0 84.004-37.749 84.004-84 0-46.253-37.75-84-84.004-84zm38.447 121.113c-1.5 2.461-4.7 3.24-7.16 1.74-19.647-11.997-44.374-14.703-73.452-8.047-2.809.644-5.609-1.117-6.249-3.925-.643-2.809 1.11-5.609 3.926-6.249 31.901-7.288 59.263-4.154 81.337 9.334 2.46 1.5 3.24 4.701 1.738 7.161v-.004zm10.266-22.861c-1.894 3.073-5.912 4.037-8.981 2.15-22.505-13.834-56.822-17.841-83.447-9.759-3.453 1.043-7.1-.903-8.148-4.35-1.04-3.453.907-7.093 4.354-8.143 30.413-9.228 68.221-4.758 94.071 11.127 3.07 1.89 4.04 5.91 2.151 8.976v-.001zm.88-23.744c-26.994-16.031-71.52-17.505-97.289-9.684-4.138 1.255-8.514-1.081-9.768-5.219-1.254-4.14 1.08-8.513 5.221-9.771 29.581-8.98 78.756-7.245 109.83 11.202 3.73 2.209 4.95 7.016 2.74 10.733-2.2 3.722-7.02 4.949-10.73 2.739h-.004z"/>
-              </svg>
-              <span className="text-xs text-gray-400">Powered by Spotify</span>
-            </div>
-          </div>
-          
           {renderMusicRecommendations()}
         </div>
       )}
+      
+      {/* Workout Completion Modal */}
       {renderWorkoutCompletionModal()}
     </div>
   );
