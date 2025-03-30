@@ -2601,168 +2601,50 @@ useEffect(() => {
   // Render music recommendations
   const renderMusicRecommendations = () => {
     return (
-      <div className="space-y-4">
-        <div className="flex justify-between items-center mb-3">
-          <div className="flex items-center space-x-2">
-            <h3 className="text-lg font-bold">Music For Your Workout</h3>
-            {stableEmotion && (
-              <div 
-                className="inline-flex items-center space-x-1 px-2 py-1 rounded text-sm"
-                style={{ backgroundColor: `${getEmotionColor(stableEmotion)}30` }}
-              >
-                <span className="text-lg" role="img" aria-label={stableEmotion}>
-                  {getEmotionEmoji(stableEmotion)}
-                </span>
-                <span>{formatEmotion(stableEmotion)}</span>
-              </div>
-            )}
-          </div>
-          
-          <div className="flex items-center space-x-3">
-            <button
+      <div>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold flex items-center">
+            Music For Your Workout <span className="ml-2">{getEmotionEmoji(currentEmotion)}</span> {formatEmotion(currentEmotion)}
+          </h3>
+          <div className="flex space-x-2">
+            <button 
               onClick={refreshMusicRecommendations}
-              className="flex items-center space-x-1 px-2 py-1 rounded bg-indigo-700 hover:bg-indigo-600 text-xs transition-colors"
-              title="Get new recommendations based on current mood"
+              className="px-2 py-1 bg-purple-600 rounded text-sm flex items-center"
             >
-              <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Refresh
+              <span className="mr-1">↻</span> Refresh
             </button>
-            
-            <div className="flex items-center">
-              <svg className="h-4 w-4 text-green-500 mr-1" viewBox="0 0 168 168" xmlns="http://www.w3.org/2000/svg">
-                <path fill="currentColor" d="M83.996 0C37.747 0 0 37.747 0 84c0 46.251 37.747 84 83.996 84 46.254 0 84.004-37.749 84.004-84 0-46.253-37.75-84-84.004-84zm38.447 121.113c-1.5 2.461-4.7 3.24-7.16 1.74-19.647-11.997-44.374-14.703-73.452-8.047-2.809.644-5.609-1.117-6.249-3.925-.643-2.809 1.11-5.609 3.926-6.249 31.901-7.288 59.263-4.154 81.337 9.334 2.46 1.5 3.24 4.701 1.738 7.161v-.004z"/>
-              </svg>
-              <span className="text-xs text-gray-400">Spotify</span>
-            </div>
-            
-            <button
+            <a 
+              href="https://open.spotify.com" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="px-2 py-1 bg-green-600 rounded text-sm flex items-center"
+            >
+              <span className="mr-1">🎧</span> Spotify
+            </a>
+            <button 
               onClick={toggleMusicPanel}
-              className="px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-xs transition-colors"
+              className="px-2 py-1 bg-gray-700 rounded text-sm"
             >
               Hide
             </button>
           </div>
         </div>
         
-        {recommendations.length === 0 ? (
-          <div className="flex items-center justify-center h-32">
-            <div className="text-center">
-              <div className="inline-flex items-center justify-center w-10 h-10 mb-3">
-                <svg className="animate-spin w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-              </div>
-              <p className="text-gray-400">
-                {stableEmotion ? "Finding music for your mood..." : "Waiting for emotion detection..."}
-              </p>
+        {/* Music tracks as embeds instead of text */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {recommendations.map((track, index) => (
+            <div key={index} className="bg-gray-900 rounded-lg overflow-hidden">
+              <iframe 
+                style={{ borderRadius: "12px" }}
+                src={`https://open.spotify.com/embed/track/${track.id}?utm_source=generator`}
+                width="100%" 
+                height="80" // Reduced height from 352
+                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
+                loading="lazy"
+              ></iframe>
             </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-60 overflow-y-auto p-2">
-            {recommendations.slice(0, 3).map((track) => (
-              <div 
-                key={track.id} 
-                className="flex bg-gray-700 rounded overflow-hidden border border-gray-600 hover:border-indigo-400 hover:bg-gray-600 transition-colors"
-              >
-                {/* Album Art - Made separately clickable */}
-                <div 
-                  className="w-16 h-16 flex-shrink-0 relative cursor-pointer"
-                  onClick={() => track.preview_url ? playPreview(track) : openSpotifyLink(track.external_url)}
-                >
-                  {track.image_url ? (
-                    <img 
-                      src={track.image_url} 
-                      alt={`${track.album} cover`} 
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gray-600 flex items-center justify-center">
-                      <span className="text-gray-400 text-xs">No Image</span>
-                    </div>
-                  )}
-                  
-                  {/* Play overlay for album art */}
-                  <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
-                    {currentPlayingTrack === track.id ? (
-                      <div className="w-5 h-5 relative">
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="w-1.5 h-5 bg-white mx-0.5 animate-pulse"></div>
-                          <div className="w-1.5 h-3 bg-white mx-0.5 animate-pulse delay-100"></div>
-                          <div className="w-1.5 h-4 bg-white mx-0.5 animate-pulse delay-200"></div>
-                        </div>
-                      </div>
-                    ) : track.preview_url ? (
-                      <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                    ) : (
-                      <svg className="w-6 h-6 text-white" viewBox="0 0 168 168" xmlns="http://www.w3.org/2000/svg">
-                        <path fill="currentColor" d="M83.996 0C37.747 0 0 37.747 0 84c0 46.251 37.747 84 83.996 84 46.254 0 84.004-37.749 84.004-84 0-46.253-37.75-84-84.004-84zm38.447 121.113c-1.5 2.461-4.7 3.24-7.16 1.74-19.647-11.997-44.374-14.703-73.452-8.047-2.809.644-5.609-1.117-6.249-3.925-.643-2.809 1.11-5.609 3.926-6.249 31.901-7.288 59.263-4.154 81.337 9.334 2.46 1.5 3.24 4.701 1.738 7.161v-.004z"/>
-                      </svg>
-                    )}
-                  </div>
-                </div>
-                
-                {/* Track Info - Made separately clickable */}
-                <div 
-                  className="flex-1 min-w-0 p-2 flex flex-col justify-between relative cursor-pointer"
-                  onClick={() => track.preview_url ? playPreview(track) : openSpotifyLink(track.external_url)}
-                >
-                  <div>
-                    <div className="font-medium text-sm truncate" title={track.title}>{track.title}</div>
-                    <div className="text-gray-300 text-xs truncate" title={track.artist}>{track.artist}</div>
-                  </div>
-                  
-                  {/* Controls */}
-                  <div className="flex items-center justify-between mt-1" onClick={(e) => e.stopPropagation()}>
-                    {/* Play/Pause Button */}
-                    {track.preview_url && (
-                      <button 
-                        onClick={() => playPreview(track)}
-                        className={`text-xs rounded-full w-7 h-7 flex items-center justify-center ${
-                          currentPlayingTrack === track.id
-                            ? 'bg-green-500 text-white'
-                            : 'bg-gray-800 hover:bg-gray-600 text-white'
-                        }`}
-                        title={currentPlayingTrack === track.id ? "Pause" : "Play preview"}
-                      >
-                        {currentPlayingTrack === track.id ? (
-                          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-                          </svg>
-                        ) : (
-                          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M8 5v14l11-7z"/>
-                          </svg>
-                        )}
-                      </button>
-                    )}
-                    
-                    {/* Spotify Button */}
-                    <button 
-                      onClick={() => openSpotifyLink(track.external_url)}
-                      className="text-xs py-1 px-3 rounded bg-green-800 hover:bg-green-700 text-green-200 flex items-center"
-                      title="Open in Spotify"
-                    >
-                      <svg className="h-3 w-3 mr-1" viewBox="0 0 168 168" xmlns="http://www.w3.org/2000/svg">
-                        <path fill="currentColor" d="M83.996 0C37.747 0 0 37.747 0 84c0 46.251 37.747 84 83.996 84 46.254 0 84.004-37.749 84.004-84 0-46.253-37.75-84-84.004-84zm38.447 121.113c-1.5 2.461-4.7 3.24-7.16 1.74-19.647-11.997-44.374-14.703-73.452-8.047-2.809.644-5.609-1.117-6.249-3.925-.643-2.809 1.11-5.609 3.926-6.249 31.901-7.288 59.263-4.154 81.337 9.334 2.46 1.5 3.24 4.701 1.738 7.161v-.004z"/>
-                      </svg>
-                      Open
-                    </button>
-                  </div>
-                  
-                  {/* Playing indicator */}
-                  {currentPlayingTrack === track.id && (
-                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-500"></div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+          ))}
+        </div>
       </div>
     );
   };
