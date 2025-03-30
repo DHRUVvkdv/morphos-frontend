@@ -3,6 +3,35 @@ import { v4 as uuidv4 } from 'uuid';
 import { useSearchParams } from 'next/navigation';
 
 
+interface WorkoutData {
+  id: string;
+  user_email: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  duration_minutes: number;
+  // T-Pose
+  tpose_performed: boolean;
+  tpose_hold_time_seconds: number;
+  tpose_form_score: number;
+  // Bicep Curl
+  bicep_curl_performed: boolean;
+  bicep_curl_reps: number;
+  bicep_curl_form_score: number;
+  // Squat
+  squat_performed: boolean;
+  squat_reps: number;
+  squat_form_score: number;
+  // Lateral Raise
+  lateral_raise_performed: boolean;
+  lateral_raise_reps: number;
+  lateral_raise_form_score: number;
+  // Plank
+  plank_performed: boolean;
+  plank_hold_time_seconds: number;
+  plank_form_score: number;
+}
+
 // Define types for feedback data
 interface FeedbackItem {
   correct: boolean;
@@ -216,6 +245,27 @@ const FitnessCoach: React.FC = () => {
   // Store timestamps for FPS calculation
   const lastFrameTime = useRef<number>(0);
   const fpsBuffer = useRef<number[]>([]);
+
+  const [workoutStartTime, setWorkoutStartTime] = useState<Date | null>(null);
+  const [exercisePerformed, setExercisePerformed] = useState<Record<string, boolean>>({
+    tpose: false,
+    bicep_curl: false,
+    squat: false,
+    lateral_raise: false,
+    plank: false
+  });
+  const [exerciseStats, setExerciseStats] = useState<Record<string, { reps: number, time: number, form: number }>>({
+    tpose: { reps: 0, time: 0, form: 0 },
+    bicep_curl: { reps: 0, time: 0, form: 0 },
+    squat: { reps: 0, time: 0, form: 0 },
+    lateral_raise: { reps: 0, time: 0, form: 0 },
+    plank: { reps: 0, time: 0, form: 0 },
+  });
+  const [showCompletionModal, setShowCompletionModal] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [userEmail, setUserEmail] = useState<string>('');
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   
   // Lifecycle management - run once when component mounts
   useEffect(() => {
@@ -227,6 +277,9 @@ const FitnessCoach: React.FC = () => {
       setIsFullyMounted(true);
       console.log('FitnessCoach component fully mounted');
     }, 500);
+
+    setWorkoutStartTime(new Date());
+    console.log('Workout start time initialized:', new Date());
     
     // Clean up everything when component unmounts
     return () => {
@@ -260,6 +313,385 @@ const FitnessCoach: React.FC = () => {
       }
     };
   }, [initialExerciseMode]);
+
+  useEffect(() => {
+    if (!poseData || !poseData.feedback) return;
+    
+    // Mark current exercise as performed
+    setExercisePerformed(prev => ({
+      ...prev,
+      [poseData.exercise_mode]: true
+    }));
+    
+    // Update exercise stats based on exercise type
+    const currentMode = poseData.exercise_mode;
+    const feedback = poseData.feedback;
+    
+    setExerciseStats(prev => {
+      const updatedStats = { ...prev };
+      
+      // Update form score for current exercise
+      updatedStats[currentMode].form = Math.max(
+        updatedStats[currentMode].form, 
+        feedback.overall.score || 0
+      );
+      
+      // Update time/reps based on exercise type
+      if (isTPoseFeedback(feedback)) {
+        updatedStats.tpose.time = Math.round(feedback.stopwatch.time / 1000); // Convert to seconds
+      } else if (isBicepCurlFeedback(feedback)) {
+        updatedStats.bicep_curl.reps = feedback.rep_phase.count;
+      } else if (isSquatFeedback(feedback)) {
+        updatedStats.squat.reps = feedback.rep_phase.count;
+      } else if (isLateralRaiseFeedback(feedback)) {
+        updatedStats.lateral_raise.reps = feedback.rep_phase.count;
+      } else if (isPlankFeedback(feedback)) {
+        updatedStats.plank.time = Math.round(feedback.stopwatch.time / 1000); // Convert to seconds
+      }
+      
+      return updatedStats;
+    });
+  }, [poseData]);
+  
+  // Function to handle finishing workout
+  const handleFinishWorkout = () => {
+    setShowCompletionModal(true);
+  };
+
+  // Function to close the completion modal
+  const handleCloseModal = () => {
+    setShowCompletionModal(false);
+    setSubmitError(null);
+    setSuccessMessage(null);
+  };
+
+// Function to submit workout data to MongoDB
+
+  const submitWorkoutData = async () => {
+    console.log('submitWorkoutData called');
+    console.log('workoutStartTime:', workoutStartTime);
+    
+    // Validate email if provided
+    // if (userEmail && !validateEmail(userEmail)) {
+    //   setSubmitError('Please enter a valid email address');
+    //   return;
+    // }
+    
+    if (!workoutStartTime) {
+      console.error('No workout start time available');
+      setSubmitError('Unable to save: Workout start time not recorded');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    setSubmitError(null);
+    setSuccessMessage(null);
+    
+    try {
+      const endTime = new Date();
+      const durationMinutes = Math.round((endTime.getTime() - workoutStartTime.getTime()) / 60000);
+      
+      console.log('Creating workout data with duration:', durationMinutes);
+      console.log('Exercise performed status:', exercisePerformed);
+      console.log('Exercise stats:', exerciseStats);
+      
+      const workoutData = {
+        user_email: userEmail || "anonymous@user.com", // Fallback if user doesn't provide email
+        date: endTime.toISOString(),
+        start_time: workoutStartTime.toISOString(),
+        end_time: endTime.toISOString(),
+        duration_minutes: durationMinutes,
+        // T-Pose data
+        tpose_performed: exercisePerformed.tpose,
+        tpose_hold_time_seconds: exerciseStats.tpose.time,
+        tpose_form_score: exerciseStats.tpose.form,
+        // Bicep Curl data
+        bicep_curl_performed: exercisePerformed.bicep_curl,
+        bicep_curl_reps: exerciseStats.bicep_curl.reps,
+        bicep_curl_form_score: exerciseStats.bicep_curl.form,
+        // Squat data
+        squat_performed: exercisePerformed.squat,
+        squat_reps: exerciseStats.squat.reps,
+        squat_form_score: exerciseStats.squat.form,
+        // Lateral Raise data
+        lateral_raise_performed: exercisePerformed.lateral_raise,
+        lateral_raise_reps: exerciseStats.lateral_raise.reps,
+        lateral_raise_form_score: exerciseStats.lateral_raise.form,
+        // Plank data
+        plank_performed: exercisePerformed.plank,
+        plank_hold_time_seconds: exerciseStats.plank.time,
+        plank_form_score: exerciseStats.plank.form
+      };
+      
+      console.log('Workout data prepared:', workoutData);
+      
+      // Create visual data display for debugging
+      const dataDiv = document.createElement('div');
+      dataDiv.style.position = 'fixed';
+      dataDiv.style.bottom = '10px';
+      dataDiv.style.right = '10px';
+      dataDiv.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+      dataDiv.style.padding = '15px';
+      dataDiv.style.borderRadius = '5px';
+      dataDiv.style.color = 'white';
+      dataDiv.style.maxWidth = '400px';
+      dataDiv.style.maxHeight = '80vh';
+      dataDiv.style.overflow = 'auto';
+      dataDiv.style.fontSize = '12px';
+      dataDiv.style.fontFamily = 'monospace';
+      dataDiv.style.zIndex = '9999';
+      dataDiv.style.boxShadow = '0 0 10px rgba(0,0,0,0.5)';
+      
+      // Send data to the actual API endpoint
+      try {
+        console.log('Sending data to API...');
+        
+        // Get API key from environment or use fallback for development
+        // In production, this should be set in your .env file and loaded properly
+        const apiKey = process.env.NEXT_PUBLIC_API_KEY || "dv"; 
+        
+        const response = await fetch('https://morphos-backend-service-1020595365432.us-central1.run.app/exercises', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'accept': 'application/json',
+            'X-API-Key': apiKey
+          },
+          body: JSON.stringify(workoutData)
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`API error: ${response.status} - ${errorText}`);
+        }
+        
+        const responseData = await response.json();
+        console.log('API response:', responseData);
+        
+        // Update the data display with success info
+        dataDiv.innerHTML = `
+          <strong style="color: #4ade80; font-size: 14px; margin-bottom: 5px; display: block;">
+            ✅ Workout Data Saved Successfully
+          </strong>
+          <div style="margin-bottom: 10px; font-size: 11px; color: #aaa;">
+            API Response: ${JSON.stringify(responseData)}
+          </div>
+          <pre style="white-space: pre-wrap;">${JSON.stringify(workoutData, null, 2)}</pre>
+        `;
+      } catch (apiError) {
+        console.error('API request failed:', apiError);
+        
+        // Update the data display with error info
+        dataDiv.innerHTML = `
+          <strong style="color: #f87171; font-size: 14px; margin-bottom: 5px; display: block;">
+            ❌ API Error: ffshit
+          </strong>
+          <div style="margin: 10px 0; padding: 8px; background: rgba(239, 68, 68, 0.2); border-radius: 4px;">
+            The data was valid but couldn't be sent to the server. 
+            Check if the API key is correct and the server is running.
+          </div>
+          <pre style="white-space: pre-wrap;">${JSON.stringify(workoutData, null, 2)}</pre>
+        `;
+        
+        throw apiError; // Re-throw to be caught by the outer catch block
+      } finally {
+        // Add a close button
+        const closeButton = document.createElement('button');
+        closeButton.innerText = 'Close';
+        closeButton.style.position = 'absolute';
+        closeButton.style.top = '10px';
+        closeButton.style.right = '10px';
+        closeButton.style.padding = '2px 6px';
+        closeButton.style.backgroundColor = '#374151';
+        closeButton.style.border = 'none';
+        closeButton.style.borderRadius = '3px';
+        closeButton.style.color = 'white';
+        closeButton.style.cursor = 'pointer';
+        closeButton.onclick = () => document.body.removeChild(dataDiv);
+        dataDiv.appendChild(closeButton);
+        
+        document.body.appendChild(dataDiv);
+        
+        // Remove the log after 15 seconds
+        setTimeout(() => {
+          if (document.body.contains(dataDiv)) {
+            document.body.removeChild(dataDiv);
+          }
+        }, 15000);
+      }
+      
+      // Success! Show success message
+      setSuccessMessage("Workout saved successfully!");
+      console.log('Success message set');
+      
+      // Keep the modal open for a moment to show the success message
+      setTimeout(() => {
+        console.log('Closing modal and resetting data');
+        setShowCompletionModal(false);
+        setSuccessMessage(null);
+        
+        // Reset workout data
+        setWorkoutStartTime(new Date());
+        setExercisePerformed({
+          tpose: false,
+          bicep_curl: false,
+          squat: false,
+          lateral_raise: false,
+          plank: false
+        });
+        setExerciseStats({
+          tpose: { reps: 0, time: 0, form: 0 },
+          bicep_curl: { reps: 0, time: 0, form: 0 },
+          squat: { reps: 0, time: 0, form: 0 },
+          lateral_raise: { reps: 0, time: 0, form: 0 },
+          plank: { reps: 0, time: 0, form: 0 },
+        });
+      }, 2000); // Show success message for 2 seconds
+      
+    } catch (error) {
+      console.error('Error submitting workout data:', error);
+      setSubmitError(typeof error === 'object' && error !== null && 'message' in error 
+        ? (error as Error).message 
+        : 'Failed to save workout data');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Render the Workout Completion Modal
+  const renderWorkoutCompletionModal = () => {
+    if (!showCompletionModal) return null;
+    
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+        <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full">
+          <h2 className="text-xl font-bold mb-4">Finish Workout</h2>
+          
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-1">Email (for tracking)</label>
+            <input
+              type="email"
+              className="w-full p-2 bg-gray-700 rounded border border-gray-600 text-white"
+              value={userEmail}
+              onChange={(e) => setUserEmail(e.target.value)}
+              placeholder="your@email.com"
+            />
+          </div>
+          
+          <div className="mb-4">
+            <h3 className="font-medium mb-2">Workout Summary</h3>
+            <div className="bg-gray-700 rounded p-3 space-y-2 text-sm">
+              <div className="grid grid-cols-2 gap-1">
+                <span>Duration:</span>
+                <span className="text-right font-medium">
+                  {workoutStartTime 
+                    ? `${Math.round((new Date().getTime() - workoutStartTime.getTime()) / 60000)} min` 
+                    : '0 min'}
+                </span>
+              </div>
+              
+              {exercisePerformed.tpose && (
+                <div className="grid grid-cols-2 gap-1">
+                  <span>T-Pose Hold:</span>
+                  <span className="text-right font-medium">
+                    {exerciseStats.tpose.time} sec (Score: {Math.round(exerciseStats.tpose.form)}%)
+                  </span>
+                </div>
+              )}
+              
+              {exercisePerformed.bicep_curl && (
+                <div className="grid grid-cols-2 gap-1">
+                  <span>Bicep Curls:</span>
+                  <span className="text-right font-medium">
+                    {exerciseStats.bicep_curl.reps} reps (Score: {Math.round(exerciseStats.bicep_curl.form)}%)
+                  </span>
+                </div>
+              )}
+              
+              {exercisePerformed.squat && (
+                <div className="grid grid-cols-2 gap-1">
+                  <span>Squats:</span>
+                  <span className="text-right font-medium">
+                    {exerciseStats.squat.reps} reps (Score: {Math.round(exerciseStats.squat.form)}%)
+                  </span>
+                </div>
+              )}
+              
+              {exercisePerformed.lateral_raise && (
+                <div className="grid grid-cols-2 gap-1">
+                  <span>Lateral Raises:</span>
+                  <span className="text-right font-medium">
+                    {exerciseStats.lateral_raise.reps} reps (Score: {Math.round(exerciseStats.lateral_raise.form)}%)
+                  </span>
+                </div>
+              )}
+              
+              {exercisePerformed.plank && (
+                <div className="grid grid-cols-2 gap-1">
+                  <span>Plank Hold:</span>
+                  <span className="text-right font-medium">
+                    {exerciseStats.plank.time} sec (Score: {Math.round(exerciseStats.plank.form)}%)
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {submitError && (
+            <div className="mb-4 p-3 bg-red-900 bg-opacity-50 rounded-lg text-sm text-red-200">
+              {submitError}
+            </div>
+          )}
+          
+          {successMessage && (
+            <div className="mb-4 p-3 bg-green-900 bg-opacity-50 rounded-lg text-sm text-green-200 flex items-center">
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              {successMessage}
+            </div>
+          )}
+          
+          <div className="flex space-x-3">
+            <button
+              onClick={handleCloseModal}
+              className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={submitWorkoutData}
+              disabled={isSubmitting || successMessage !== null}
+              className={`flex-1 px-4 py-2 rounded-lg text-sm transition-colors flex items-center justify-center ${
+                isSubmitting 
+                  ? 'bg-indigo-700 cursor-not-allowed' 
+                  : successMessage !== null
+                  ? 'bg-green-600 cursor-not-allowed'
+                  : 'bg-indigo-600 hover:bg-indigo-500'
+              }`}
+            >
+              {isSubmitting ? (
+                <>
+                  <div className="animate-spin mr-2 w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+                  Saving...
+                </>
+              ) : successMessage !== null ? (
+                <>
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Saved!
+                </>
+              ) : (
+                'Save Workout'
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   
   // Connect to WebSocket server
   useEffect(() => {
@@ -1375,6 +1807,17 @@ const FitnessCoach: React.FC = () => {
             <option value="lateral_raise">Lateral Raise (Reps)</option>
             <option value="plank">Plank (Hold)</option>
           </select>
+          
+          {/* Finish Workout Button */}
+          <button
+            onClick={handleFinishWorkout}
+            className="w-full mt-2 px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-medium transition-colors flex items-center justify-center"
+          >
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            Finish Workout
+          </button>
         </div>
       </div>
     );
@@ -1521,6 +1964,7 @@ const FitnessCoach: React.FC = () => {
           {renderMusicRecommendations()}
         </div>
       )}
+      {renderWorkoutCompletionModal()}
     </div>
   );
 };
