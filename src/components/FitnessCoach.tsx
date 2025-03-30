@@ -225,6 +225,24 @@ const FitnessCoach: React.FC = () => {
 
   const searchParams = useSearchParams() || new URLSearchParams();
 
+  type FeedbackPriority = 'high' | 'medium' | 'low';
+
+  // Define feedback item structure
+  interface PendingFeedback {
+    message: string;
+    priority: FeedbackPriority;
+    timestamp: number;
+  }
+
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [lastSpokenMessage, setLastSpokenMessage] = useState('');
+  const [lastSpokenTime, setLastSpokenTime] = useState(0);
+  const isSpeakingRef = useRef<boolean>(false);
+  const pendingAdviceRef = useRef<string | null>(null);
+  const pendingFeedbackRef = useRef<PendingFeedback | null>(null);
+
+  const PAUSE_BETWEEN_COMMANDS = 800;
+
   const mapExerciseIdToMode = (exerciseId: string | null): string => {
     switch (exerciseId) {
       case 'bicep-curl':
@@ -278,6 +296,707 @@ const FitnessCoach: React.FC = () => {
       setUserEmail(user.email);
     }
   }, [user]);
+
+  const speakMessage = (message: string): void => {
+    if (!voiceEnabled || !message || message.trim() === '') return;
+    
+    // Don't repeat the same message too frequently (within 3 seconds)
+    const now = Date.now();
+    if (message === lastSpokenMessage && now - lastSpokenTime < 3000) return;
+    
+    // If already speaking, don't interrupt
+    if (isSpeakingRef.current) {
+      return;
+    }
+    
+    // Not speaking, so we can speak this message
+    isSpeakingRef.current = true;
+    setLastSpokenMessage(message);
+    setLastSpokenTime(now);
+    
+    // Create speech synthesis utterance
+    const speech = new SpeechSynthesisUtterance(message);
+    
+    // Configure voice settings
+    speech.volume = 1.0;
+    speech.rate = 1.0;
+    speech.pitch = 1.0;
+    
+    // Use a voice that sounds clear and authoritative if available
+    const voices = window.speechSynthesis.getVoices();
+    const preferredVoice = voices.find(voice => 
+      voice.name.includes('Google') || voice.name.includes('English') || voice.name.includes('US')
+    );
+    
+    if (preferredVoice) {
+      speech.voice = preferredVoice;
+    }
+    
+    // When finished speaking, reset the speaking flag
+    speech.onend = () => {
+      isSpeakingRef.current = false;
+    };
+    
+    // Handle errors
+    speech.onerror = () => {
+      isSpeakingRef.current = false;
+    };
+    
+    // Speak the message
+    window.speechSynthesis.speak(speech);
+  };
+  
+  
+  // Helper function to actually perform the speaking
+  // const speakMessageImmediately = (message: string, priority: FeedbackPriority, timestamp: number): void => {
+  //   isSpeakingRef.current = true;
+  //   setLastSpokenMessage(message);
+  //   setLastSpokenTime(timestamp);
+    
+  //   // Create speech synthesis utterance
+  //   const speech = new SpeechSynthesisUtterance(message);
+    
+  //   // Configure voice settings for clarity during workout
+  //   speech.volume = 1.0;
+  //   speech.rate = 1.0;
+  //   speech.pitch = 1.0;
+    
+  //   // Use a voice that sounds clear and authoritative if available
+  //   const voices = window.speechSynthesis.getVoices();
+  //   const preferredVoice = voices.find(voice => 
+  //     voice.name.includes('Google') || voice.name.includes('English') || voice.name.includes('US')
+  //   );
+    
+  //   if (preferredVoice) {
+  //     speech.voice = preferredVoice;
+  //   }
+    
+  //   // Handle speech end - check for pending advice with pause
+  //   speech.onend = () => {
+  //     isSpeakingRef.current = false;
+      
+  //     // If there's pending advice, speak it after a pause
+  //     if (pendingFeedbackRef.current) {
+  //       const pendingFeedback = pendingFeedbackRef.current;
+  //       pendingFeedbackRef.current = null;
+        
+  //       // Add a natural pause between commands
+  //       setTimeout(() => {
+  //         speakMessageImmediately(
+  //           pendingFeedback.message, 
+  //           pendingFeedback.priority,
+  //           pendingFeedback.timestamp
+  //         );
+  //       }, PAUSE_BETWEEN_COMMANDS);
+  //     }
+  //   };
+    
+  //   // Handle speech error - make sure we reset speaking state
+  //   speech.onerror = () => {
+  //     isSpeakingRef.current = false;
+      
+  //     // If there's pending advice, try to speak it after error
+  //     if (pendingFeedbackRef.current) {
+  //       const pendingFeedback = pendingFeedbackRef.current;
+  //       pendingFeedbackRef.current = null;
+        
+  //       setTimeout(() => {
+  //         speakMessageImmediately(
+  //           pendingFeedback.message, 
+  //           pendingFeedback.priority,
+  //           pendingFeedback.timestamp
+  //         );
+  //       }, 300); // Shorter pause after error
+  //     }
+  //   };
+    
+  //   // Speak the message
+  //   window.speechSynthesis.speak(speech);
+  // };
+  
+  // Update the toggle function
+  const toggleVoiceEnabled = (): void => {
+    if (voiceEnabled) {
+      window.speechSynthesis.cancel();
+      isSpeakingRef.current = false;
+    } else {
+      setVoiceEnabled(true);
+      setTimeout(() => {
+        speakMessage("Voice coaching activated");
+      }, 100);
+      return;
+    }
+    setVoiceEnabled(!voiceEnabled);
+  };
+
+  // Helper function to determine the priority of specific feedback
+  const getFeedbackPriority = (feedbackType: string, isCorrect: boolean): FeedbackPriority => {
+    // If the form is incorrect, it's high priority feedback
+    if (!isCorrect) {
+      // Form-specific feedback gets highest priority
+      switch (feedbackType) {
+        case 'left_arm':
+        case 'right_arm':
+        case 'elbow_angle':
+        case 'arm_position':
+        case 'knee_angle':
+        case 'hip_position':
+        case 'arm_angle':
+        case 'arm_symmetry':
+        case 'body_alignment':
+          return 'high';
+        case 'posture':
+          return 'medium';
+        default:
+          return 'medium';
+      }
+    }
+    
+    // Correct form feedback is lower priority
+    return 'low';
+  };
+
+  useEffect(() => {
+    if (!window.speechSynthesis) return;
+    
+    // Load voices if needed
+    const loadVoices = () => {
+      window.speechSynthesis.getVoices();
+    };
+    
+    loadVoices();
+    
+    // Some browsers need this event to access voices
+    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!poseData || !poseData.feedback || !voiceEnabled || isSpeakingRef.current) return;
+    
+    const feedback = poseData.feedback;
+    const exerciseMode = poseData.exercise_mode;
+    const now = Date.now();
+    const timeSinceLastSpoken = now - lastSpokenTime;
+    
+    // Only speak every few seconds to avoid too much chatter
+    if (timeSinceLastSpoken < 3000) return;
+    
+    // Try to find highest priority feedback first
+    let messageToSpeak = '';
+    let priorityFound = false;
+    
+    // HIGH PRIORITY: Check for specific form issues first (always prioritize these)
+    if (exerciseMode === 'tpose' && isTPoseFeedback(feedback)) {
+      if (!feedback.left_arm.correct) {
+        messageToSpeak = feedback.left_arm.message;
+        priorityFound = true;
+      } else if (!feedback.right_arm.correct) {
+        messageToSpeak = feedback.right_arm.message;
+        priorityFound = true;
+      }
+    } else if (exerciseMode === 'bicep_curl' && isBicepCurlFeedback(feedback)) {
+      if (!feedback.elbow_angle.correct) {
+        messageToSpeak = feedback.elbow_angle.message;
+        priorityFound = true;
+      } else if (!feedback.arm_position.correct) {
+        messageToSpeak = feedback.arm_position.message;
+        priorityFound = true;
+      }
+    } else if (exerciseMode === 'squat' && isSquatFeedback(feedback)) {
+      if (!feedback.knee_angle.correct) {
+        messageToSpeak = feedback.knee_angle.message;
+        priorityFound = true;
+      } else if (!feedback.hip_position.correct) {
+        messageToSpeak = feedback.hip_position.message;
+        priorityFound = true;
+      }
+    } else if (exerciseMode === 'lateral_raise' && isLateralRaiseFeedback(feedback)) {
+      if (!feedback.arm_angle.correct) {
+        messageToSpeak = feedback.arm_angle.message;
+        priorityFound = true;
+      } else if (!feedback.arm_symmetry.correct) {
+        messageToSpeak = feedback.arm_symmetry.message;
+        priorityFound = true;
+      }
+    } else if (exerciseMode === 'plank' && isPlankFeedback(feedback)) {
+      if (!feedback.body_alignment.correct) {
+        messageToSpeak = feedback.body_alignment.message;
+        priorityFound = true;
+      } else if (!feedback.hip_position.correct) {
+        messageToSpeak = feedback.hip_position.message;
+        priorityFound = true;
+      }
+    }
+    
+    // MEDIUM PRIORITY: Rep counts and time milestones
+    if (!priorityFound) {
+      // Rep-based exercises
+      if (['bicep_curl', 'squat', 'lateral_raise'].includes(exerciseMode) && 
+          'rep_phase' in feedback) {
+        const repPhase = (feedback as any).rep_phase;
+        if (repPhase.count > 0 && repPhase.count % 5 === 0 && 
+            !lastSpokenMessage.includes(`${repPhase.count} reps`)) {
+          messageToSpeak = `${repPhase.count} reps completed. Great work!`;
+          priorityFound = true;
+        }
+      } 
+      // Time-based exercises
+      else if (['tpose', 'plank'].includes(exerciseMode) && 
+               'stopwatch' in feedback) {
+        const stopwatch = (feedback as any).stopwatch;
+        const seconds = Math.floor(stopwatch.time / 1000);
+        
+        if (stopwatch.isRunning && seconds > 0) {
+          if ((seconds <= 30 && seconds % 5 === 0) || 
+              (seconds > 30 && seconds % 10 === 0)) {
+            if (!lastSpokenMessage.includes(`${seconds} seconds`)) {
+              messageToSpeak = `${seconds} seconds. Keep holding!`;
+              priorityFound = true;
+            }
+          } else if (seconds === 15 && !lastSpokenMessage.includes('halfway')) {
+            messageToSpeak = "You're halfway to 30 seconds!";
+            priorityFound = true;
+          } else if (seconds === 30 && !lastSpokenMessage.includes('30 seconds')) {
+            messageToSpeak = "30 seconds achieved! Great work!";
+            priorityFound = true;
+          } else if (seconds === 60 && !lastSpokenMessage.includes('minute')) {
+            messageToSpeak = "One minute hold! Outstanding!";
+            priorityFound = true;
+          }
+        }
+      }
+    }
+    
+    // LOW PRIORITY: Overall messages
+    if (!priorityFound && timeSinceLastSpoken > 5000) {
+      // If nothing more important to say, use the overall message
+      if (!feedback.overall.message.includes(lastSpokenMessage)) {
+        messageToSpeak = feedback.overall.message;
+      }
+    }
+    
+    // If we found a message to speak, do it
+    if (messageToSpeak) {
+      speakMessage(messageToSpeak);
+    }
+  }, [poseData, voiceEnabled, lastSpokenMessage, lastSpokenTime]);
+
+  // Helper function to extract the most important form feedback
+function getExerciseSpecificFormFeedback(feedback: Feedback, exerciseMode: string): { message: string, formPart: string, isCorrect: boolean } | null {
+  // For each exercise mode, check the most critical form factors first
+  
+  switch(exerciseMode) {
+    case 'tpose':
+      // Check arms first, then posture
+      if (isTPoseFeedback(feedback)) {
+        if (!feedback.left_arm.correct) {
+          return { 
+            message: feedback.left_arm.message,
+            formPart: 'left_arm',
+            isCorrect: false
+          };
+        }
+        if (!feedback.right_arm.correct) {
+          return { 
+            message: feedback.right_arm.message,
+            formPart: 'right_arm',
+            isCorrect: false
+          };
+        }
+        if (!feedback.posture.correct) {
+          return { 
+            message: feedback.posture.message,
+            formPart: 'posture',
+            isCorrect: false
+          };
+        }
+      }
+      break;
+      
+    case 'bicep_curl':
+      // Check elbow angle first (most important), then arm position, then posture
+      if (isBicepCurlFeedback(feedback)) {
+        if (!feedback.elbow_angle.correct) {
+          return { 
+            message: feedback.elbow_angle.message,
+            formPart: 'elbow_angle',
+            isCorrect: false
+          };
+        }
+        if (!feedback.arm_position.correct) {
+          return { 
+            message: feedback.arm_position.message,
+            formPart: 'arm_position',
+            isCorrect: false
+          };
+        }
+        if (!feedback.posture.correct) {
+          return { 
+            message: feedback.posture.message,
+            formPart: 'posture',
+            isCorrect: false
+          };
+        }
+      }
+      break;
+      
+    case 'squat':
+      // Check knee angle first, then hip position, then posture
+      if (isSquatFeedback(feedback)) {
+        if (!feedback.knee_angle.correct) {
+          return { 
+            message: feedback.knee_angle.message,
+            formPart: 'knee_angle',
+            isCorrect: false
+          };
+        }
+        if (!feedback.hip_position.correct) {
+          return { 
+            message: feedback.hip_position.message,
+            formPart: 'hip_position',
+            isCorrect: false
+          };
+        }
+        if (!feedback.posture.correct) {
+          return { 
+            message: feedback.posture.message,
+            formPart: 'posture',
+            isCorrect: false
+          };
+        }
+      }
+      break;
+      
+    case 'lateral_raise':
+      // Check arm angle/symmetry first, then posture
+      if (isLateralRaiseFeedback(feedback)) {
+        if (!feedback.arm_angle.correct) {
+          return { 
+            message: feedback.arm_angle.message,
+            formPart: 'arm_angle',
+            isCorrect: false
+          };
+        }
+        if (!feedback.arm_symmetry.correct) {
+          return { 
+            message: feedback.arm_symmetry.message,
+            formPart: 'arm_symmetry',
+            isCorrect: false
+          };
+        }
+        if (!feedback.posture.correct) {
+          return { 
+            message: feedback.posture.message,
+            formPart: 'posture',
+            isCorrect: false
+          };
+        }
+      }
+      break;
+      
+    case 'plank':
+      // Check body alignment and hip position
+      if (isPlankFeedback(feedback)) {
+        if (!feedback.body_alignment.correct) {
+          return { 
+            message: feedback.body_alignment.message,
+            formPart: 'body_alignment',
+            isCorrect: false
+          };
+        }
+        if (!feedback.hip_position.correct) {
+          return { 
+            message: feedback.hip_position.message,
+            formPart: 'hip_position',
+            isCorrect: false
+          };
+        }
+      }
+      break;
+  }
+  
+  // If no specific incorrect form feedback, return overall message
+  return { 
+    message: feedback.overall.message,
+    formPart: 'overall',
+    isCorrect: feedback.overall.correct
+  };
+}
+  
+  // Add this function to extract the most important feedback for each exercise type
+const getExerciseSpecificFeedback = (feedback: any, exerciseMode: string) => {
+  if (!feedback) return null;
+
+  // Common case: if overall message indicates good form, use it
+  if (feedback.overall.correct) {
+    return { 
+      message: feedback.overall.message,
+      priority: 'low'  // Lower priority for positive feedback
+    };
+  }
+  
+  // Otherwise, find the most important correction to announce
+  switch(exerciseMode) {
+    case 'tpose':
+      // For T-pose, prioritize arm position over posture
+      if (!feedback.left_arm.correct) {
+        return {
+          message: feedback.left_arm.message,
+          priority: 'high'
+        };
+      }
+      if (!feedback.right_arm.correct) {
+        return {
+          message: feedback.right_arm.message,
+          priority: 'high'
+        };
+      }
+      if (!feedback.posture.correct) {
+        return {
+          message: feedback.posture.message,
+          priority: 'medium'
+        };
+      }
+      break;
+      
+    case 'bicep_curl':
+      // For bicep curl, prioritize elbow angle
+      if (!feedback.elbow_angle.correct) {
+        return {
+          message: feedback.elbow_angle.message,
+          priority: 'high'
+        };
+      }
+      if (!feedback.arm_position.correct) {
+        return {
+          message: feedback.arm_position.message, 
+          priority: 'medium'
+        };
+      }
+      if (!feedback.posture.correct) {
+        return {
+          message: feedback.posture.message,
+          priority: 'low'
+        };
+      }
+      break;
+      
+    case 'squat':
+      // For squat, prioritize knee angle over hip position
+      if (!feedback.knee_angle.correct) {
+        return {
+          message: feedback.knee_angle.message,
+          priority: 'high'
+        };
+      }
+      if (!feedback.hip_position.correct) {
+        return {
+          message: feedback.hip_position.message,
+          priority: 'medium'
+        };
+      }
+      if (!feedback.posture.correct) {
+        return {
+          message: feedback.posture.message,
+          priority: 'medium'
+        };
+      }
+      break;
+      
+    case 'lateral_raise':
+      // For lateral raise, prioritize arm angles
+      if (!feedback.arm_angle.correct) {
+        return {
+          message: feedback.arm_angle.message,
+          priority: 'high'
+        };
+      }
+      if (!feedback.arm_symmetry.correct) {
+        return {
+          message: feedback.arm_symmetry.message,
+          priority: 'high'
+        };
+      }
+      if (!feedback.posture.correct) {
+        return {
+          message: feedback.posture.message,
+          priority: 'medium'
+        };
+      }
+      break;
+      
+    case 'plank':
+      // For plank, prioritize body alignment
+      if (!feedback.body_alignment.correct) {
+        return {
+          message: feedback.body_alignment.message,
+          priority: 'high'
+        };
+      }
+      if (!feedback.hip_position.correct) {
+        return {
+          message: feedback.hip_position.message,
+          priority: 'high'
+        };
+      }
+      break;
+      
+    default:
+      // Fallback to overall message
+      return {
+        message: feedback.overall.message,
+        priority: 'medium'
+      };
+  }
+  
+  // If no specific issues found, use overall message
+  return {
+    message: feedback.overall.message,
+    priority: 'medium'
+  };
+};
+
+// Now modify the existing useEffect to use this function for more intelligent speech
+useEffect(() => {
+  if (!poseData || !poseData.feedback || !voiceEnabled) return;
+  
+  const feedback = poseData.feedback;
+  const exerciseMode = poseData.exercise_mode;
+  
+  // Track when to speak rep counts or time
+  const now = Date.now();
+  const timeSinceLastSpoken = now - lastSpokenTime;
+  
+  // Get the most important feedback for the current exercise
+  const specificFeedback = getExerciseSpecificFeedback(feedback, exerciseMode);
+  
+  // Initialize message to speak
+  let messageToSpeak = '';
+  let shouldSpeak = false;
+  
+  // Handle rep-based exercises announcements
+  if (
+    (exerciseMode === 'bicep_curl' || 
+     exerciseMode === 'squat' || 
+     exerciseMode === 'lateral_raise') && 
+    'rep_phase' in feedback
+  ) {
+    const repPhase = feedback.rep_phase;
+    
+    // Announce milestone reps (every 5 reps)
+    if (repPhase.count > 0 && repPhase.count % 5 === 0) {
+      // Check if we haven't already announced this count
+      const repCountMessage = `${repPhase.count} reps`;
+      if (!lastSpokenMessage.includes(repCountMessage) && timeSinceLastSpoken > 2000) {
+        messageToSpeak = `${repPhase.count} reps completed. Great work!`;
+        shouldSpeak = true;
+      }
+    }
+    
+    // If not announcing reps and we have specific feedback, use it
+    if (!shouldSpeak && specificFeedback) {
+      // Only speak corrections every few seconds to avoid overwhelming the user
+      if (specificFeedback.priority === 'high' && timeSinceLastSpoken > 3000) {
+        messageToSpeak = specificFeedback.message;
+        shouldSpeak = true;
+      } else if (specificFeedback.priority === 'medium' && timeSinceLastSpoken > 5000) {
+        messageToSpeak = specificFeedback.message;
+        shouldSpeak = true;
+      } else if (specificFeedback.priority === 'low' && timeSinceLastSpoken > 8000) {
+        messageToSpeak = specificFeedback.message;
+        shouldSpeak = true;
+      }
+    }
+  }
+  // Handle hold exercises (T-pose, plank)
+  else if ((exerciseMode === 'tpose' || exerciseMode === 'plank') && 
+          'stopwatch' in feedback) {
+    const stopwatch = feedback.stopwatch;
+    const seconds = Math.floor(stopwatch.time / 1000);
+    
+    // Announce time milestones if holding with good form
+    if (stopwatch.isRunning && feedback.overall.correct) {
+      // Every 5 seconds for the first 30 seconds, then every 10
+      if ((seconds <= 30 && seconds % 5 === 0) || 
+          (seconds > 30 && seconds % 10 === 0)) {
+        // Check if we haven't announced this time already
+        const timeMessage = `${seconds} seconds`;
+        if (!lastSpokenMessage.includes(timeMessage) && timeSinceLastSpoken > 2000) {
+          messageToSpeak = `${seconds} seconds. Keep holding!`;
+          shouldSpeak = true;
+        }
+      }
+      
+      // Special milestone encouragements
+      if (seconds === 15 && !lastSpokenMessage.includes('halfway')) {
+        messageToSpeak = "You're halfway to 30 seconds!";
+        shouldSpeak = true;
+      } else if (seconds === 30 && !lastSpokenMessage.includes('30 seconds')) {
+        messageToSpeak = "30 seconds achieved! Great work!";
+        shouldSpeak = true;
+      } else if (seconds === 60 && !lastSpokenMessage.includes('minute')) {
+        messageToSpeak = "One minute hold! Outstanding!";
+        shouldSpeak = true;
+      }
+    }
+    
+    // If not announcing time and we have specific feedback, use it
+    if (!shouldSpeak && specificFeedback) {
+      // Only speak corrections every few seconds
+      if (specificFeedback.priority === 'high' && timeSinceLastSpoken > 3000) {
+        messageToSpeak = specificFeedback.message;
+        shouldSpeak = true;
+      } else if (specificFeedback.priority === 'medium' && timeSinceLastSpoken > 5000) {
+        messageToSpeak = specificFeedback.message;
+        shouldSpeak = true;
+      }
+    }
+  }
+  
+  // If we've determined we should speak, do it
+  if (shouldSpeak && messageToSpeak) {
+    speakMessage(messageToSpeak);
+  }
+}, [poseData, voiceEnabled, lastSpokenMessage, lastSpokenTime]);
+
+// Add this function to announce exercise mode changes
+const announceExerciseMode = (mode: string) => {
+  if (!voiceEnabled) return;
+  
+  let modeName = "";
+  switch(mode) {
+    case 'tpose':
+      modeName = "T-Pose Hold";
+      break;
+    case 'bicep_curl':
+      modeName = "Bicep Curl";
+      break;
+    case 'squat':
+      modeName = "Squat";
+      break;
+    case 'lateral_raise':
+      modeName = "Lateral Raise";
+      break;
+    case 'plank':
+      modeName = "Plank";
+      break;
+    default:
+      modeName = mode;
+  }
+  
+  speakMessage(`Switching to ${modeName} exercise`);
+};
+
+
 
   
   // Lifecycle management - run once when component mounts
@@ -1162,14 +1881,20 @@ const FitnessCoach: React.FC = () => {
   }, [isFullyMounted, isConnected, frameInterval]);
   
   // Handle exercise mode change
-  const handleModeChange = (newMode: string) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ 
-        command: 'set_mode', 
-        mode: newMode 
-      }));
+  // Modify the handleModeChange function to announce mode changes
+const handleModeChange = (newMode: string) => {
+  if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+    wsRef.current.send(JSON.stringify({ 
+      command: 'set_mode', 
+      mode: newMode 
+    }));
+    
+    // Announce the mode change (only if different from current mode)
+    if (newMode !== exerciseMode) {
+      announceExerciseMode(newMode);
     }
-  };
+  }
+};
 
   // Toggle music panel
   const toggleMusicPanel = () => {
@@ -2126,9 +2851,25 @@ useEffect(() => {
           
           {/* Status Bar */}
           <div className="absolute top-0 left-0 right-0 bg-black bg-opacity-50 p-2 flex justify-between items-center">
-            {/* FPS Counter */}
+            {/* FPS Counter and Voice Toggle */}
             <div className="flex items-center space-x-4">
               <span className="text-sm">FPS: {fps}</span>
+              
+              {/* Voice Coach Toggle Button */}
+              <button
+                onClick={toggleVoiceEnabled}
+                className={`flex items-center space-x-1 px-2 py-1 rounded transition-colors ${
+                  voiceEnabled 
+                    ? 'bg-green-700 hover:bg-green-600' 
+                    : 'bg-gray-700 hover:bg-gray-600'
+                }`}
+                title={voiceEnabled ? "Turn off voice coaching" : "Turn on voice coaching"}
+              >
+                <span role="img" aria-label="voice">
+                  {voiceEnabled ? '🔊' : '🔈'}
+                </span>
+                <span className="text-xs sm:text-sm">Voice</span>
+              </button>
               
               {/* Emotion Display */}
               <div 
