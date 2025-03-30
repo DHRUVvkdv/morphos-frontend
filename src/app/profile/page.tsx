@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useUser } from "@/backend/userProvider";
 import apiClient from "@/backend/axiosInstance";
+import Image from "next/image";
 
 type FitnessGoal = "build muscle" | "lose weight" | "improve flexibility" | "increase endurance" | "general fitness";
 type FitnessLevel = "beginner" | "intermediate" | "advanced";
@@ -204,10 +205,19 @@ export default function ProfilePage() {
             <header className="border-b border-gray-800 bg-gray-900 bg-opacity-90 sticky top-0 z-50 shadow-md">
                 <div className="container mx-auto px-6 py-4 flex justify-between items-center">
                     <div className="flex items-center">
-                        <Link href="/">
-                            <span className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-600">
-                                Morphos
-                            </span>
+                        <Link href="/homepage">
+                            <div className="flex items-center space-x-2">
+                                <img
+                                    src="/logo.png"
+                                    alt="Morphos Logo"
+                                    width={32}
+                                    height={32}
+                                    className="rounded-md"
+                                />
+                                <span className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-600">
+                                    Morphos
+                                </span>
+                            </div>
                         </Link>
                     </div>
                     <nav className="flex items-center space-x-6">

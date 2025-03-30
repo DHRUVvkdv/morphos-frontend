@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import ReactMarkdown from 'react-markdown';
 import { useUser } from "@/backend/userProvider";
+import Image from "next/image";
 
 export default function HomePage() {
     const [selectedWorkout, setSelectedWorkout] = useState<string | null>(null);
@@ -153,8 +154,15 @@ export default function HomePage() {
         <div className="min-h-screen bg-gradient-to-b from-gray-900 to-indigo-950 text-white flex flex-col">
             {/* Header with improved styling */}
             <header className="border-b border-gray-800 bg-gray-900 bg-opacity-90 sticky top-0 z-50 shadow-md">
-                <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-                    <div className="flex items-center">
+                <div className="container mx-auto px-0 py-4 flex justify-between items-center">
+                    <div className="flex items-center space-x-2">
+                        <img
+                            src="/logo.png"
+                            alt="Morphos Logo"
+                            width={32}
+                            height={32}
+                            className="rounded-md"
+                        />
                         <span className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-600">
                             Morphos
                         </span>
@@ -163,7 +171,7 @@ export default function HomePage() {
                         <Link href="/profile">
                             <span className="text-gray-300 hover:text-white transition-colors font-medium">Profile</span>
                         </Link>
-                        <button onClick={handleLogout}  className="px-4 py-2 rounded-md bg-red-600 hover:bg-red-700 transition-colors font-medium shadow-sm">
+                        <button onClick={handleLogout} className="px-4 py-2 rounded-md bg-red-600 hover:bg-red-700 transition-colors font-medium shadow-sm">
                             Sign Out
                         </button>
                     </nav>
@@ -171,9 +179,9 @@ export default function HomePage() {
             </header>
 
             {/* Main Content - More balanced three-column Layout */}
-            <main className="flex flex-grow">
+            <main className="flex flex-grow w-full">
                 {/* Left Sidebar - Available Workouts with refined styling */}
-                <aside className="w-72 bg-gray-800 bg-opacity-60 overflow-y-auto border-r border-gray-800">
+                <aside className="w-72 bg-gray-800 bg-opacity-60 overflow-y-auto border-r border-gray-800 pl-0">
                     <div className="p-5">
                         <h2 className="text-xl font-semibold mb-5 text-blue-400 flex items-center">
                             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">

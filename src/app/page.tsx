@@ -19,24 +19,27 @@ export default function LandingPage() {
         <div className={`transition-all duration-1000 transform ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
           <h1 className="text-4xl md:text-6xl font-bold mb-4">
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-600">
-              Motion
+              Morph
             </span>
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-500">
-              Mind
+              os
             </span>
           </h1>
-          
+
           <p className="text-xl md:text-2xl max-w-3xl mx-auto mb-8 text-gray-300">
             AI-powered fitness coaching with real-time pose tracking and emotion-based motivation
           </p>
-          
+
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/auth">
               <button className="px-8 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full font-medium hover:shadow-lg hover:from-blue-600 hover:to-indigo-700 transition duration-300 transform hover:-translate-y-1">
                 Sign In
               </button>
             </Link>
-            <button className="px-8 py-3 bg-transparent border-2 border-gray-400 rounded-full font-medium hover:border-white transition duration-300">
+            <button
+              onClick={() => window.open("https://www.youtube.com/watch?v=Y2RtiOomxgs", "_blank")}
+              className="px-8 py-3 bg-transparent border-2 border-gray-400 rounded-full font-medium hover:border-white transition duration-300"
+            >
               Watch Demo
             </button>
           </div>
@@ -60,8 +63,8 @@ export default function LandingPage() {
       {/* Features Section */}
       <section className="py-20 px-4 md:px-8">
         <div className="max-w-7xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">How MotionMind Works</h2>
-          
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">How Morphos Works</h2>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
             {/* Feature 1 */}
             <div className="bg-gray-800 bg-opacity-50 p-8 rounded-xl transform transition duration-300 hover:scale-105">
@@ -75,7 +78,7 @@ export default function LandingPage() {
                 Your personal AI trainer tracks your movements in real-time, counts your reps, and provides feedback on your form to ensure optimal results.
               </p>
             </div>
-            
+
             {/* Feature 2 */}
             <div className="bg-gray-800 bg-opacity-50 p-8 rounded-xl transform transition duration-300 hover:scale-105">
               <div className="bg-purple-600 w-14 h-14 rounded-lg flex items-center justify-center mb-6">
@@ -88,7 +91,7 @@ export default function LandingPage() {
                 Our advanced AI detects your emotional state and adapts music and motivation to keep you engaged and push through challenging moments.
               </p>
             </div>
-            
+
             {/* Feature 3 */}
             <div className="bg-gray-800 bg-opacity-50 p-8 rounded-xl transform transition duration-300 hover:scale-105">
               <div className="bg-pink-600 w-14 h-14 rounded-lg flex items-center justify-center mb-6">
@@ -110,7 +113,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row items-center gap-12">
             <div className="md:w-1/2">
-              <h2 className="text-3xl md:text-4xl font-bold mb-6">See MotionMind in Action</h2>
+              <h2 className="text-3xl md:text-4xl font-bold mb-6">See Morphos in Action</h2>
               <p className="text-gray-400 text-lg mb-8">
                 Experience how our AI coach monitors your form, counts reps, and adjusts to your energy level - all in real-time through your device camera.
               </p>
@@ -130,93 +133,30 @@ export default function LandingPage() {
                 ))}
               </ul>
             </div>
-            
+
             <div className="md:w-1/2 rounded-2xl overflow-hidden border-4 border-gray-800 shadow-2xl">
-              {/* Placeholder for a video or demo animation */}
-              <div className="aspect-video bg-gray-800 flex items-center justify-center">
-                <svg className="w-20 h-20 text-indigo-500 opacity-50" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                </svg>
+              <div className="aspect-video relative">
+                <iframe
+                  className="absolute inset-0 w-full h-full"
+                  src="https://www.youtube.com/embed/Y2RtiOomxgs?si=C_nf0DaVImtMvR5b"
+                  title="YouTube video player"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  allowFullScreen
+                ></iframe>
               </div>
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-20 px-4 md:px-8 bg-gradient-to-r from-indigo-900 to-purple-900">
-        <div className="max-w-5xl mx-auto text-center">
-          <h2 className="text-3xl md:text-5xl font-bold mb-8">Ready to Transform Your Fitness Journey?</h2>
-          <p className="text-xl text-gray-300 mb-10 max-w-3xl mx-auto">
-            Join thousands of users who are already experiencing the future of AI-powered fitness coaching.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/auth/page">
-              <button className="px-8 py-4 bg-white text-indigo-900 rounded-full font-medium hover:shadow-lg transition duration-300 transform hover:-translate-y-1">
-                Start Your Free Trial
-              </button>
-            </Link>
-            <button className="px-8 py-4 bg-transparent border-2 border-white rounded-full font-medium hover:bg-white hover:text-indigo-900 transition duration-300">
-              Learn More
-            </button>
-          </div>
-          <p className="text-gray-400 mt-6">No credit card required. Free 14-day trial.</p>
         </div>
       </section>
 
       {/* Footer */}
       <footer className="py-12 px-4 md:px-8 bg-gray-900">
         <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
-            <div>
-              <h3 className="font-semibold text-lg mb-4">Product</h3>
-              <ul className="space-y-2">
-                {['Features', 'Pricing', 'Integrations', 'FAQ'].map((item, index) => (
-                  <li key={index}><a href="#" className="text-gray-400 hover:text-white transition">
-                    {item}
-                  </a></li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold text-lg mb-4">Company</h3>
-              <ul className="space-y-2">
-                {['About', 'Blog', 'Careers', 'Contact'].map((item, index) => (
-                  <li key={index}><a href="#" className="text-gray-400 hover:text-white transition">
-                    {item}
-                  </a></li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold text-lg mb-4">Resources</h3>
-              <ul className="space-y-2">
-                {['Community', 'Help Center', 'Partners', 'Privacy'].map((item, index) => (
-                  <li key={index}><a href="#" className="text-gray-400 hover:text-white transition">
-                    {item}
-                  </a></li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold text-lg mb-4">Follow Us</h3>
-              <div className="flex space-x-4">
-                {['facebook', 'twitter', 'instagram', 'youtube'].map((platform, index) => (
-                  <a key={index} href="#" className="text-gray-400 hover:text-white transition">
-                    <span className="sr-only">{platform}</span>
-                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path fillRule="evenodd" d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" clipRule="evenodd" />
-                    </svg>
-                  </a>
-                ))}
-              </div>
-            </div>
-          </div>
-          
           <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center mb-4 md:mb-0">
               <span className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-600 mr-2">
-                MotionMind
+                Morphos
               </span>
               <span className="text-gray-500">© 2025. All rights reserved.</span>
             </div>
