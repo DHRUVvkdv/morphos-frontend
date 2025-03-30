@@ -50,7 +50,7 @@ export default function SignInForm() {
         <div>
           <label 
             htmlFor="email" 
-            className="block text-sm font-medium text-indigo-300 mb-1"
+            className="block text-sm font-medium text-gray-700 dark:text-indigo-300 mb-1"
           >
             Email
           </label>
@@ -60,7 +60,7 @@ export default function SignInForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full px-4 py-3 rounded-md bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
+            className="w-full px-4 py-3 rounded-md bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
             placeholder="Enter your email"
           />
         </div>
@@ -69,7 +69,7 @@ export default function SignInForm() {
           <div className="flex items-center justify-between mb-1">
             <label 
               htmlFor="password" 
-              className="block text-sm font-medium text-indigo-300"
+              className="block text-sm font-medium text-gray-700 dark:text-indigo-300"
             >
               Password
             </label>
@@ -80,7 +80,7 @@ export default function SignInForm() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="w-full px-4 py-3 rounded-md bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
+            className="w-full px-4 py-3 rounded-md bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
             placeholder="Enter your password"
           />
         </div>

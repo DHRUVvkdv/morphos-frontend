@@ -132,33 +132,33 @@ const SignupPage = () => {
         </div>
         
         {/* Progress Bar */}
-        <div className="bg-[#212a3e] px-8 py-5">
-          <div className="relative flex justify-between">
-            {/* Progress line */}
-            <div className="absolute top-1/2 left-0 right-0 h-1 bg-[#2c354a] -translate-y-1/2"></div>
-            {/* Progress fill - width controlled by current step */}
-            <div 
-              className="absolute top-1/2 left-0 h-1 bg-gradient-to-r from-blue-500 to-purple-500 -translate-y-1/2 transition-all duration-300"
-              style={{ width: `${(currentStep / 3) * 100}%` }}
-            ></div>
+        <div className="bg-[#212a3e] px-8 py-8">
+    <div className="relative flex justify-between mb-6">
+        {/* Progress line */}
+        <div className="absolute top-1/2 left-0 right-0 h-1 bg-[#2c354a] -translate-y-1/2"></div>
+        {/* Progress fill */}
+        <div 
+        className="absolute top-1/2 left-0 h-1 bg-gradient-to-r from-blue-500 to-purple-500 -translate-y-1/2 transition-all duration-300"
+        style={{ width: `${(currentStep / 3) * 100}%` }}
+        ></div>
             
             {/* Step indicators */}
             {[0, 1, 2, 3].map((step, index) => (
-              <div 
+            <div 
                 key={index}
-                className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-full font-semibold transition-all duration-300 ${
-                  currentStep >= step 
+                className={`relative z-10 flex h-12 w-12 items-center justify-center rounded-full font-semibold transition-all duration-300 ${
+                currentStep >= step 
                     ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white' 
                     : 'bg-[#2c354a] text-gray-400'
                 }`}
-              >
+            >
                 {step + 1}
-                <span className="absolute top-10 left-0 text-xs text-[#8c9cb8] w-max -translate-x-1/2">
-                  {['Account', 'Profile', 'Goals', 'Equipment'][step]}
+                <span className="absolute top-16 text-sm text-[#8c9cb8] w-max style={{ left: '50%', transform: 'translateX(-50%)' }}">
+                {['Account', 'Profile', 'Goals', 'Equipment'][step]}
                 </span>
-              </div>
+            </div>
             ))}
-          </div>
+        </div>
         </div>
         
         {/* Form Container */}
