@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useSearchParams } from 'next/navigation';
+import { useUser } from '@/backend/userProvider';
 
 
 interface WorkoutData {
@@ -266,6 +267,15 @@ const FitnessCoach: React.FC = () => {
   const [userEmail, setUserEmail] = useState<string>('');
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const { user } = useUser();
+
+  useEffect(() => {
+    if (user && user.email) {
+      setUserEmail(user.email);
+    }
+  }, [user]);
+
   
   // Lifecycle management - run once when component mounts
   useEffect(() => {
@@ -394,9 +404,13 @@ const FitnessCoach: React.FC = () => {
       console.log('Creating workout data with duration:', durationMinutes);
       console.log('Exercise performed status:', exercisePerformed);
       console.log('Exercise stats:', exerciseStats);
+
+      const email = (user && user.email) ? user.email : 
+                    userEmail ? userEmail : 
+                    "anonymous@user.com";
       
       const workoutData = {
-        user_email: userEmail || "anonymous@user.com", // Fallback if user doesn't provide email
+        user_email: email,
         date: endTime.toISOString(),
         start_time: workoutStartTime.toISOString(),
         end_time: endTime.toISOString(),
@@ -448,7 +462,7 @@ const FitnessCoach: React.FC = () => {
         
         // Get API key from environment or use fallback for development
         // In production, this should be set in your .env file and loaded properly
-        const apiKey = process.env.NEXT_PUBLIC_API_KEY || "dv"; 
+        const apiKey = process.env.NEXT_PUBLIC_API_KEY || ""; 
         
         const response = await fetch('https://morphos-backend-service-1020595365432.us-central1.run.app/exercises', {
           method: 'POST',
@@ -567,15 +581,22 @@ const FitnessCoach: React.FC = () => {
         <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full">
           <h2 className="text-xl font-bold mb-4">Finish Workout</h2>
           
+          {/* Display user's email instead of input field if we have it */}
           <div className="mb-4">
             <label className="block text-sm font-medium mb-1">Email (for tracking)</label>
-            <input
-              type="email"
-              className="w-full p-2 bg-gray-700 rounded border border-gray-600 text-white"
-              value={userEmail}
-              onChange={(e) => setUserEmail(e.target.value)}
-              placeholder="your@email.com"
-            />
+            {user && user.email ? (
+              <div className="w-full p-2 bg-gray-700 rounded border border-gray-600 text-white">
+                {user.email}
+              </div>
+            ) : (
+              <input
+                type="email"
+                className="w-full p-2 bg-gray-700 rounded border border-gray-600 text-white"
+                value={userEmail}
+                onChange={(e) => setUserEmail(e.target.value)}
+                placeholder="your@email.com"
+              />
+            )}
           </div>
           
           <div className="mb-4">
