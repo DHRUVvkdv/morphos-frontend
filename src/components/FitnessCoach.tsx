@@ -2632,7 +2632,7 @@ useEffect(() => {
         
         {/* Music tracks as embeds instead of text */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {recommendations.map((track, index) => (
+          {recommendations.slice(0, 3).map((track, index) => (
             <div key={index} className="bg-gray-900 rounded-lg overflow-hidden">
               <iframe 
                 style={{ borderRadius: "12px" }}
