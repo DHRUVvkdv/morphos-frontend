@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, 
   Tooltip, Legend, ResponsiveContainer, BarChart, 
-  Bar, PieChart, Pie, Cell, AreaChart, Area
+  Bar, AreaChart, Area
 } from 'recharts';
 import { Calendar, ChevronDown, Clock, Dumbbell, Flame, Zap } from 'lucide-react';
 
@@ -22,14 +22,6 @@ const mockExerciseProgress = [
   { name: 'Bicep Curls', week1: 30, week2: 35, week3: 40, week4: 45 },
   { name: 'Hip Mobility', week1: 65, week2: 72, week3: 80, week4: 86 },
   { name: 'Sumo Squats', week1: 50, week2: 56, week3: 62, week4: 68 },
-];
-
-const mockEmotionData = [
-  { name: 'Happy', value: 35, color: '#6366F1' },
-  { name: 'Focused', value: 40, color: '#8B5CF6' },
-  { name: 'Tired', value: 15, color: '#EC4899' },
-  { name: 'Frustrated', value: 5, color: '#F43F5E' },
-  { name: 'Neutral', value: 5, color: '#94A3B8' },
 ];
 
 const mockFormData = [
@@ -281,7 +273,7 @@ const AnalyticsDashboard = () => {
             </ResponsiveContainer>
           </div>
           
-          {/* Emotion Distribution Chart */}
+          {/* Goal Progress Section - Moved here to replace Emotion Distribution */}
           <div className="bg-gray-800 rounded-xl p-5 border border-gray-700 shadow-lg">
             <div className="flex justify-between items-center mb-2">
               <h2 className="text-xl font-semibold text-gray-200">Emotion Distribution</h2>
