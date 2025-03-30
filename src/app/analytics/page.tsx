@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, 
   Tooltip, Legend, ResponsiveContainer, BarChart, 
-  Bar, PieChart, Pie, Cell, AreaChart, Area
+  Bar, AreaChart, Area
 } from 'recharts';
 import { Calendar, ChevronDown, Clock, Dumbbell, Flame, Zap } from 'lucide-react';
 
@@ -22,14 +22,6 @@ const mockExerciseProgress = [
   { name: 'Bicep Curls', week1: 30, week2: 35, week3: 40, week4: 45 },
   { name: 'Hip Mobility', week1: 65, week2: 72, week3: 80, week4: 86 },
   { name: 'Sumo Squats', week1: 50, week2: 56, week3: 62, week4: 68 },
-];
-
-const mockEmotionData = [
-  { name: 'Happy', value: 35, color: '#6366F1' },
-  { name: 'Focused', value: 40, color: '#8B5CF6' },
-  { name: 'Tired', value: 15, color: '#EC4899' },
-  { name: 'Frustrated', value: 5, color: '#F43F5E' },
-  { name: 'Neutral', value: 5, color: '#94A3B8' },
 ];
 
 const mockFormData = [
@@ -281,110 +273,63 @@ const AnalyticsDashboard = () => {
             </ResponsiveContainer>
           </div>
           
-          {/* Emotion Distribution Chart */}
+          {/* Goal Progress Section - Moved here to replace Emotion Distribution */}
           <div className="bg-gray-800 rounded-xl p-5 border border-gray-700 shadow-lg">
-            <div className="flex justify-between items-center mb-2">
-              <h2 className="text-xl font-semibold text-gray-200">Emotion Distribution</h2>
-              <button className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">
-                View Details
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold text-gray-200">Goal Progress</h2>
+              <button className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1">
+                <Zap size={14} />
+                <span>Add Goal</span>
               </button>
             </div>
-            <div className="text-sm text-gray-400 mb-4">During your workouts</div>
-            <div className="flex items-center justify-center h-[280px]">
-              <ResponsiveContainer width="100%" height={280}>
-                <PieChart>
-                  <Pie
-                    data={mockEmotionData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {mockEmotionData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#1F2937', borderColor: '#4B5563', borderRadius: '0.5rem' }} 
-                    itemStyle={{ color: '#E5E7EB' }}
-                    labelStyle={{ color: '#9CA3AF' }}
-                    formatter={(value) => [`${value}%`, 'Percentage']}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 mt-2">
-              {mockEmotionData.map((entry, index) => (
-                <div key={index} className="flex items-center">
-                  <span 
-                    className="inline-block w-3 h-3 rounded-full mr-1" 
-                    style={{ backgroundColor: entry.color }}
-                  ></span>
-                  <span className="text-xs text-gray-400">{entry.name}: {entry.value}%</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-        
-        {/* Goal Progress Section */}
-        <div className="mt-8 bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-semibold text-gray-200">Goal Progress</h2>
-            <button className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1">
-              <Zap size={14} />
-              <span>Add Goal</span>
-            </button>
-          </div>
-          
-          <div className="space-y-6">
-            <div>
-              <div className="flex justify-between mb-2">
-                <div>
-                  <span className="text-gray-200 font-medium">Build Biceps Strength</span>
-                  <p className="text-xs text-gray-400 mt-1">Current: 45 lbs curls × 12 reps</p>
-                </div>
-                <span className="text-violet-400 font-medium">75%</span>
-              </div>
-              <div className="w-full bg-gray-700 rounded-full h-2">
-                <div 
-                  className="h-2 rounded-full bg-gradient-to-r from-blue-500 to-violet-500" 
-                  style={{ width: '75%' }}
-                ></div>
-              </div>
-            </div>
             
-            <div>
-              <div className="flex justify-between mb-2">
-                <div>
-                  <span className="text-gray-200 font-medium">Increase Hip Flexibility</span>
-                  <p className="text-xs text-gray-400 mt-1">Hip mobility score: 82/100</p>
+            <div className="space-y-6">
+              <div>
+                <div className="flex justify-between mb-2">
+                  <div>
+                    <span className="text-gray-200 font-medium">Build Biceps Strength</span>
+                    <p className="text-xs text-gray-400 mt-1">Current: 45 lbs curls × 12 reps</p>
+                  </div>
+                  <span className="text-violet-400 font-medium">75%</span>
                 </div>
-                <span className="text-violet-400 font-medium">60%</span>
-              </div>
-              <div className="w-full bg-gray-700 rounded-full h-2">
-                <div 
-                  className="h-2 rounded-full bg-gradient-to-r from-violet-500 to-purple-500" 
-                  style={{ width: '60%' }}
-                ></div>
-              </div>
-            </div>
-            
-            <div>
-              <div className="flex justify-between mb-2">
-                <div>
-                  <span className="text-gray-200 font-medium">Workout Consistency</span>
-                  <p className="text-xs text-gray-400 mt-1">Target: 4 workouts per week</p>
+                <div className="w-full bg-gray-700 rounded-full h-2">
+                  <div 
+                    className="h-2 rounded-full bg-gradient-to-r from-blue-500 to-violet-500" 
+                    style={{ width: '75%' }}
+                  ></div>
                 </div>
-                <span className="text-violet-400 font-medium">85%</span>
               </div>
-              <div className="w-full bg-gray-700 rounded-full h-2">
-                <div 
-                  className="h-2 rounded-full bg-gradient-to-r from-purple-500 to-pink-500" 
-                  style={{ width: '85%' }}
-                ></div>
+              
+              <div>
+                <div className="flex justify-between mb-2">
+                  <div>
+                    <span className="text-gray-200 font-medium">Increase Hip Flexibility</span>
+                    <p className="text-xs text-gray-400 mt-1">Hip mobility score: 82/100</p>
+                  </div>
+                  <span className="text-violet-400 font-medium">60%</span>
+                </div>
+                <div className="w-full bg-gray-700 rounded-full h-2">
+                  <div 
+                    className="h-2 rounded-full bg-gradient-to-r from-violet-500 to-purple-500" 
+                    style={{ width: '60%' }}
+                  ></div>
+                </div>
+              </div>
+              
+              <div>
+                <div className="flex justify-between mb-2">
+                  <div>
+                    <span className="text-gray-200 font-medium">Workout Consistency</span>
+                    <p className="text-xs text-gray-400 mt-1">Target: 4 workouts per week</p>
+                  </div>
+                  <span className="text-violet-400 font-medium">85%</span>
+                </div>
+                <div className="w-full bg-gray-700 rounded-full h-2">
+                  <div 
+                    className="h-2 rounded-full bg-gradient-to-r from-purple-500 to-pink-500" 
+                    style={{ width: '85%' }}
+                  ></div>
+                </div>
               </div>
             </div>
           </div>
