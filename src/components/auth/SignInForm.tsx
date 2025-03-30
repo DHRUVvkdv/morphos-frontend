@@ -1,43 +1,57 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
+import Link from "next/link";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function SignInForm() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    
-    // Mock sign-in logic - replace with your actual authentication code
+    setIsLoading(true);
+    setError("");
+
     try {
-      // Add your auth logic here
-      console.log('Signing in with:', { email, password });
+      // This would be replaced with your actual auth logic
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulating API call
       
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Handle successful login (redirect, etc.)
-    } catch (error) {
-      console.error('Login error:', error);
+      // If successful, navigate to home page
+      router.push("/");
+    } catch (err) {
+      setError("Invalid email or password. Please try again.");
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="max-w-md w-full">
-      <div className="mb-10">
-        <h1 className="text-3xl font-bold mb-2">Sign in</h1>
-        <p className="text-gray-600">Enter your password to access your account.</p>
+    <div>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 mb-2">
+          Sign in
+        </h1>
+        <p className="text-gray-400">
+          Enter your credentials to access your account.
+        </p>
       </div>
 
+      {error && (
+        <div className="mb-4 p-3 bg-red-900/30 border border-red-800 rounded-md text-red-200 text-sm">
+          {error}
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="space-y-2">
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+        <div>
+          <label 
+            htmlFor="email" 
+            className="block text-sm font-medium text-indigo-300 mb-1"
+          >
             Email
           </label>
           <input
@@ -46,32 +60,41 @@ export default function SignInForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+            className="w-full px-4 py-3 rounded-md bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
             placeholder="Enter your email"
           />
         </div>
 
-        <div className="space-y-2">
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-            Password
-          </label>
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label 
+              htmlFor="password" 
+              className="block text-sm font-medium text-indigo-300"
+            >
+              Password
+            </label>
+          </div>
           <input
             id="password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+            className="w-full px-4 py-3 rounded-md bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
             placeholder="Enter your password"
           />
         </div>
 
         <button
           type="submit"
-          className="w-full py-3 px-4 bg-black text-white font-medium rounded-md hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black transition duration-150 ease-in-out"
-          disabled={loading}
+          disabled={isLoading}
+          className={`w-full px-4 py-3 rounded-md font-medium transition-colors ${
+            isLoading
+              ? "bg-indigo-700 cursor-not-allowed"
+              : "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
+          }`}
         >
-          {loading ? (
+          {isLoading ? (
             <span className="flex items-center justify-center">
               <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -80,17 +103,29 @@ export default function SignInForm() {
               Signing in...
             </span>
           ) : (
-            'Sign in'
+            "Sign in"
           )}
         </button>
       </form>
 
-      <div className="mt-6 text-center">
-        <p className="text-gray-600">
-          Need an account?{' '}
-          <Link href="/auth/signup" className="text-purple-600 hover:text-purple-500 font-medium">
+      <div className="mt-8 text-center">
+        <p className="text-gray-400">
+          Need an account?{" "}
+          <Link 
+            href="/auth/signup" 
+            className="text-indigo-400 hover:text-indigo-300 transition-colors font-medium"
+          >
             Sign up here
           </Link>
+        </p>
+      </div>
+
+      <div className="mt-8 pt-8 border-t border-gray-800">
+        <p className="text-xs text-center text-gray-500">
+          By signing in, you agree to our{" "}
+          <a href="#" className="text-indigo-400 hover:text-indigo-300">Terms of Service</a>
+          {" "}and{" "}
+          <a href="#" className="text-indigo-400 hover:text-indigo-300">Privacy Policy</a>
         </p>
       </div>
     </div>
