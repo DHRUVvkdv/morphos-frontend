@@ -1,5 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import { useSearchParams } from 'next/navigation';
+
 
 // Define types for feedback data
 interface FeedbackItem {
@@ -23,6 +25,11 @@ interface BaseFeedback {
 interface TPoseFeedback extends BaseFeedback {
   left_arm: FeedbackItem;
   right_arm: FeedbackItem;
+  stopwatch: {
+    time: number;       // Time in milliseconds
+    isRunning: boolean; // Whether the stopwatch is currently running
+    lastStartTime: number | null; // Timestamp when the stopwatch was last started
+  };
 }
 
 // Bicep curl specific feedback
@@ -32,8 +39,31 @@ interface BicepCurlFeedback extends BaseFeedback {
   rep_phase: RepPhase;
 }
 
+interface SquatFeedback extends BaseFeedback {
+  knee_angle: FeedbackItem;
+  hip_position: FeedbackItem;
+  rep_phase: RepPhase;
+}
+
+interface LateralRaiseFeedback extends BaseFeedback {
+  arm_angle: FeedbackItem;
+  arm_symmetry: FeedbackItem;
+  rep_phase: RepPhase;
+}
+
+interface PlankFeedback extends BaseFeedback {
+  body_alignment: FeedbackItem;
+  hip_position: FeedbackItem;
+  // head_position: FeedbackItem;
+  stopwatch: {
+    time: number;
+    isRunning: boolean;
+    lastStartTime: number | null;
+  };
+}
+
 // Combined type
-type Feedback = TPoseFeedback | BicepCurlFeedback;
+type Feedback = TPoseFeedback | BicepCurlFeedback | SquatFeedback | LateralRaiseFeedback | PlankFeedback;
 
 // Define emotion types
 type EmotionType = 'neutral' | 'happy' | 'sad' | 'angry' | 'fearful' | 'disgusted' | 'surprised' | 'tired' | 'detecting...' | 'No face detected' | 'unknown';
@@ -74,12 +104,33 @@ interface CombinedData {
 
 // Type guard functions
 function isTPoseFeedback(feedback: Feedback): feedback is TPoseFeedback {
-  return 'left_arm' in feedback && 'right_arm' in feedback;
+  return 'left_arm' in feedback && 'right_arm' in feedback && 'stopwatch' in feedback;
 }
 
 function isBicepCurlFeedback(feedback: Feedback): feedback is BicepCurlFeedback {
   return 'elbow_angle' in feedback && 'arm_position' in feedback && 'rep_phase' in feedback;
 }
+
+function isSquatFeedback(feedback: Feedback): feedback is SquatFeedback {
+  return 'knee_angle' in feedback && 'hip_position' in feedback && 'rep_phase' in feedback;
+}
+
+function isLateralRaiseFeedback(feedback: Feedback): feedback is LateralRaiseFeedback {
+  return 'arm_angle' in feedback && 'arm_symmetry' in feedback && 'rep_phase' in feedback;
+}
+
+function isPlankFeedback(feedback: Feedback): feedback is PlankFeedback {
+  return 'body_alignment' in feedback && 'hip_position' in feedback && 'stopwatch' in feedback;
+}
+
+const formatTime = (timeInMs: number): string => {
+  const totalSeconds = Math.floor(timeInMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  const milliseconds = Math.floor((timeInMs % 1000) / 10); // Show only 2 digits of ms
+  
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(milliseconds).padStart(2, '0')}`;
+};
 
 // Define UI colors for feedback
 const COLORS = {
@@ -123,7 +174,7 @@ const FitnessCoach: React.FC = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   
   const [isConnected, setIsConnected] = useState<boolean>(false);
-  const [exerciseMode, setExerciseMode] = useState<string>('tpose');
+  
   const [poseData, setPoseData] = useState<PoseData | null>(null);
   const [fps, setFps] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
@@ -138,6 +189,29 @@ const FitnessCoach: React.FC = () => {
   const [recommendations, setRecommendations] = useState<SpotifyTrack[]>([]);
   const [showMusicPanel, setShowMusicPanel] = useState<boolean>(false);
   const [currentPlayingTrack, setCurrentPlayingTrack] = useState<string | null>(null);
+
+  const searchParams = useSearchParams();
+
+  const mapExerciseIdToMode = (exerciseId: string | null): string => {
+    switch (exerciseId) {
+      case 'bicep-curl':
+        return 'bicep_curl';
+      case 'squat':
+        return 'squat';
+      case 'lateral-raise':
+        return 'lateral_raise';
+      case 'plank':
+        return 'plank';
+      case 'tpose':
+        return 'tpose';
+      default:
+        return 'tpose'; // Default fallback
+    }
+  };
+
+  const exerciseFromUrl = searchParams.get('exercise');
+  const initialExerciseMode = mapExerciseIdToMode(exerciseFromUrl);
+  const [exerciseMode, setExerciseMode] = useState<string>('tpose');
   
   // Store timestamps for FPS calculation
   const lastFrameTime = useRef<number>(0);
@@ -185,7 +259,7 @@ const FitnessCoach: React.FC = () => {
         audioRef.current = null;
       }
     };
-  }, []);
+  }, [initialExerciseMode]);
   
   // Connect to WebSocket server
   useEffect(() => {
@@ -270,6 +344,14 @@ const FitnessCoach: React.FC = () => {
             setIsConnected(true);
             setError(null);
             connectionAttempts = 0; // Reset attempt counter on success
+          }
+
+          if (initialExerciseMode !== 'tpose') {
+            ws.send(JSON.stringify({ 
+              command: 'set_mode', 
+              mode: initialExerciseMode 
+            }));
+            console.log(`Sent initial exercise mode: ${initialExerciseMode}`);
           }
         };
         
@@ -625,8 +707,7 @@ const FitnessCoach: React.FC = () => {
   }, [isFullyMounted, isConnected, frameInterval]);
   
   // Handle exercise mode change
-  const handleModeChange = () => {
-    const newMode = exerciseMode === 'tpose' ? 'bicep_curl' : 'tpose';
+  const handleModeChange = (newMode: string) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ 
         command: 'set_mode', 
@@ -793,6 +874,10 @@ const FitnessCoach: React.FC = () => {
       const RIGHT_WRIST = 10;
       const LEFT_HIP = 11;
       const RIGHT_HIP = 12;
+      const LEFT_KNEE = 13;
+      const RIGHT_KNEE = 14;
+      const LEFT_ANKLE = 15;
+      const RIGHT_ANKLE = 16;
       
       // Draw skeleton based on exercise mode
       const feedback = poseData.feedback;
@@ -814,6 +899,7 @@ const FitnessCoach: React.FC = () => {
         drawConnection(LEFT_HIP, RIGHT_HIP, postureColor, 3);
         drawConnection(LEFT_SHOULDER, LEFT_HIP, postureColor, 3);
         drawConnection(RIGHT_SHOULDER, RIGHT_HIP, postureColor, 3);
+      
       } else if (mode === 'bicep_curl' && isBicepCurlFeedback(feedback)) {
         // For bicep curl mode
         // Draw posture
@@ -831,6 +917,71 @@ const FitnessCoach: React.FC = () => {
         drawConnection(LEFT_ELBOW, LEFT_WRIST, elbowColor, 3);
         drawConnection(RIGHT_SHOULDER, RIGHT_ELBOW, armColor, 3);
         drawConnection(RIGHT_ELBOW, RIGHT_WRIST, elbowColor, 3);
+      } else if (mode === 'squat' && isSquatFeedback(feedback)) {
+        // For squat mode
+        // Draw posture
+        const postureColor = feedback.posture.correct ? COLORS.correct : COLORS.incorrect;
+        drawConnection(LEFT_SHOULDER, RIGHT_SHOULDER, postureColor, 3);
+        drawConnection(LEFT_SHOULDER, LEFT_HIP, postureColor, 3);
+        drawConnection(RIGHT_SHOULDER, RIGHT_HIP, postureColor, 3);
+        
+        // Draw legs
+        const kneeColor = feedback.knee_angle.correct ? COLORS.correct : COLORS.incorrect;
+        const hipColor = feedback.hip_position.correct ? COLORS.correct : COLORS.incorrect;
+        
+        // Hip connections
+        drawConnection(LEFT_HIP, RIGHT_HIP, hipColor, 3);
+        
+        // Leg connections
+        drawConnection(LEFT_HIP, LEFT_KNEE, kneeColor, 3);
+        drawConnection(LEFT_KNEE, LEFT_ANKLE, kneeColor, 3);
+        drawConnection(RIGHT_HIP, RIGHT_KNEE, kneeColor, 3);
+        drawConnection(RIGHT_KNEE, RIGHT_ANKLE, kneeColor, 3);
+
+      } else if (mode === 'lateral_raise' && isLateralRaiseFeedback(feedback)) {
+        // For lateral raise mode
+        // Draw posture
+        const postureColor = feedback.posture.correct ? COLORS.correct : COLORS.incorrect;
+        drawConnection(LEFT_SHOULDER, RIGHT_SHOULDER, postureColor, 3);
+        drawConnection(LEFT_HIP, RIGHT_HIP, postureColor, 3);
+        drawConnection(LEFT_SHOULDER, LEFT_HIP, postureColor, 3);
+        drawConnection(RIGHT_SHOULDER, RIGHT_HIP, postureColor, 3);
+        
+        // Draw arms
+        const armColor = feedback.arm_angle.correct ? COLORS.correct : COLORS.incorrect;
+        const symmetryColor = feedback.arm_symmetry.correct ? COLORS.correct : COLORS.incorrect;
+        
+        // Color the connections based on symmetry
+        const leftArmColor = symmetryColor === COLORS.correct ? armColor : COLORS.incorrect;
+        const rightArmColor = symmetryColor === COLORS.correct ? armColor : COLORS.incorrect;
+        
+        drawConnection(LEFT_SHOULDER, LEFT_ELBOW, leftArmColor, 3);
+        drawConnection(LEFT_ELBOW, LEFT_WRIST, leftArmColor, 3);
+        drawConnection(RIGHT_SHOULDER, RIGHT_ELBOW, rightArmColor, 3);
+        drawConnection(RIGHT_ELBOW, RIGHT_WRIST, rightArmColor, 3);
+
+      } else if (mode === 'plank' && isPlankFeedback(feedback)) {
+        // For plank mode
+        // Draw body alignment (shoulder to ankle line)
+        const alignmentColor = feedback.body_alignment.correct ? COLORS.correct : COLORS.incorrect;
+        const hipColor = feedback.hip_position.correct ? COLORS.correct : COLORS.incorrect;
+        // const headColor = feedback.head_position.correct ? COLORS.correct : COLORS.incorrect;
+        
+        // Draw upper body
+        drawConnection(LEFT_SHOULDER, RIGHT_SHOULDER, alignmentColor, 3);
+        
+        // Draw body alignment line
+        drawConnection(LEFT_SHOULDER, LEFT_HIP, alignmentColor, 3);
+        drawConnection(RIGHT_SHOULDER, RIGHT_HIP, alignmentColor, 3);
+        
+        // Draw hips
+        drawConnection(LEFT_HIP, RIGHT_HIP, hipColor, 3);
+        
+        // Draw legs
+        drawConnection(LEFT_HIP, LEFT_KNEE, alignmentColor, 3);
+        drawConnection(LEFT_KNEE, LEFT_ANKLE, alignmentColor, 3);
+        drawConnection(RIGHT_HIP, RIGHT_KNEE, alignmentColor, 3);
+        drawConnection(RIGHT_KNEE, RIGHT_ANKLE, alignmentColor, 3);
       }
       
       // Draw keypoints
@@ -975,6 +1126,21 @@ const FitnessCoach: React.FC = () => {
         {isTPoseFeedback(poseData.feedback) ? (
           // T-Pose feedback
           <>
+            <div className="mb-6 bg-gray-700 p-3 rounded-lg">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-yellow-400">HOLD TIME</span>
+                <span className="text-3xl font-bold">
+                  {formatTime(poseData.feedback.stopwatch.time)}
+                </span>
+              </div>
+              <div className="text-center mt-2 font-bold text-sm">
+                <span className={`
+                  ${poseData.feedback.stopwatch.isRunning ? 'text-green-400' : 'text-gray-400'}
+                `}>
+                  {poseData.feedback.stopwatch.isRunning ? 'HOLDING' : 'NOT HOLDING'}
+                </span>
+              </div>
+            </div>
             <FeedbackSection 
               label="Left Arm" 
               data={poseData.feedback.left_arm} 
@@ -1021,6 +1187,103 @@ const FitnessCoach: React.FC = () => {
               data={poseData.feedback.posture} 
             />
           </>
+          ) : isSquatFeedback(poseData.feedback) ? (
+            // Squat feedback
+            <>
+              {/* Rep Counter */}
+              <div className="mb-6 bg-gray-700 p-3 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-yellow-400">REPS</span>
+                  <span className="text-3xl font-bold">{poseData.feedback.rep_phase.count}</span>
+                </div>
+                <div className="text-center mt-2 font-bold text-sm">
+                  <span className={`
+                    ${poseData.feedback.rep_phase.status === 'up' ? 'text-yellow-400' :
+                      poseData.feedback.rep_phase.status === 'down' ? 'text-green-400' : 'text-cyan-400'}
+                  `}>
+                    {poseData.feedback.rep_phase.status === 'up' ? 'STANDING' :
+                      poseData.feedback.rep_phase.status === 'down' ? 'SQUATTING' : 'MOVING'}
+                  </span>
+                </div>
+              </div>
+              
+              <FeedbackSection 
+                label="Knee Angle" 
+                data={poseData.feedback.knee_angle} 
+              />
+              <FeedbackSection 
+                label="Hip Position" 
+                data={poseData.feedback.hip_position} 
+              />
+              <FeedbackSection 
+                label="Posture" 
+                data={poseData.feedback.posture} 
+              />
+            </>
+          ) : isLateralRaiseFeedback(poseData.feedback) ? (
+            // Lateral raise feedback
+            <>
+              {/* Rep Counter */}
+              <div className="mb-6 bg-gray-700 p-3 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-yellow-400">REPS</span>
+                  <span className="text-3xl font-bold">{poseData.feedback.rep_phase.count}</span>
+                </div>
+                <div className="text-center mt-2 font-bold text-sm">
+                  <span className={`
+                    ${poseData.feedback.rep_phase.status === 'up' ? 'text-yellow-400' :
+                      poseData.feedback.rep_phase.status === 'down' ? 'text-green-400' : 'text-cyan-400'}
+                  `}>
+                    {poseData.feedback.rep_phase.status === 'up' ? 'RAISED' :
+                      poseData.feedback.rep_phase.status === 'down' ? 'LOWERED' : 'MOVING'}
+                  </span>
+                </div>
+              </div>
+              
+              <FeedbackSection 
+                label="Arm Height" 
+                data={poseData.feedback.arm_angle} 
+              />
+              <FeedbackSection 
+                label="Arm Symmetry" 
+                data={poseData.feedback.arm_symmetry} 
+              />
+              <FeedbackSection 
+                label="Posture" 
+                data={poseData.feedback.posture} 
+              />
+            </>
+          ) : isPlankFeedback(poseData.feedback) ? (
+            // Plank feedback
+            <>
+              <div className="mb-6 bg-gray-700 p-3 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-yellow-400">HOLD TIME</span>
+                  <span className="text-3xl font-bold">
+                    {formatTime(poseData.feedback.stopwatch.time)}
+                  </span>
+                </div>
+                <div className="text-center mt-2 font-bold text-sm">
+                  <span className={`
+                    ${poseData.feedback.stopwatch.isRunning ? 'text-green-400' : 'text-gray-400'}
+                  `}>
+                    {poseData.feedback.stopwatch.isRunning ? 'HOLDING' : 'NOT HOLDING'}
+                  </span>
+                </div>
+              </div>
+              <FeedbackSection 
+                label="Body Alignment" 
+                data={poseData.feedback.body_alignment} 
+              />
+              <FeedbackSection 
+                label="Hip Position" 
+                data={poseData.feedback.hip_position} 
+              />
+              {/* <FeedbackSection 
+                label="Head Position" 
+                data={poseData.feedback.head_position} 
+              /> */}
+            </>
         ) : (
           // Fallback for unknown feedback type
           <div className="text-center text-red-400">
@@ -1092,6 +1355,27 @@ const FitnessCoach: React.FC = () => {
             </div>
           </div>
         ))}
+      </div>
+    );
+  };
+
+  const renderExerciseModeSelector = () => {
+    return (
+      <div className="p-4 bg-gray-700">
+        <label className="block text-sm font-medium mb-2">Exercise Mode</label>
+        <div className="grid grid-cols-1 gap-2">
+          <select
+            className="w-full p-2 bg-gray-800 rounded border border-gray-600 text-white"
+            value={exerciseMode}
+            onChange={(e) => handleModeChange(e.target.value)}
+          >
+            <option value="tpose">T-Pose (Hold)</option>
+            <option value="bicep_curl">Bicep Curl (Reps)</option>
+            <option value="squat">Squat (Reps)</option>
+            <option value="lateral_raise">Lateral Raise (Reps)</option>
+            <option value="plank">Plank (Hold)</option>
+          </select>
+        </div>
       </div>
     );
   };
@@ -1189,7 +1473,11 @@ const FitnessCoach: React.FC = () => {
           <div className="bg-blue-600 p-4">
             <h2 className="text-xl font-bold text-center">POSE COACH</h2>
             <p className="text-center text-sm mt-1">
-              {exerciseMode === 'tpose' ? 'T-Pose Mode' : 'Bicep Curl Mode'}
+              {exerciseMode === 'tpose' ? 'T-Pose Hold' : 
+               exerciseMode === 'bicep_curl' ? 'Bicep Curl Reps' :
+               exerciseMode === 'squat' ? 'Squat Reps' :
+               exerciseMode === 'lateral_raise' ? 'Lateral Raise Reps' :
+               'Plank Hold'}
             </p>
           </div>
           
@@ -1198,15 +1486,8 @@ const FitnessCoach: React.FC = () => {
             {renderFeedbackSections()}
           </div>
           
-          {/* Footer with Controls */}
-          <div className="p-4 bg-gray-700">
-            <button 
-              onClick={handleModeChange}
-              className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-            >
-              Switch to {exerciseMode === 'tpose' ? 'Bicep Curl' : 'T-Pose'} Mode
-            </button>
-          </div>
+          {/* Exercise Mode Selector */}
+          {renderExerciseModeSelector()}
         </div>
       </div>
       

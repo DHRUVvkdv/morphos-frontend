@@ -12,42 +12,42 @@ export default function HomePage() {
   ]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // Sample workout data
+  // Updated workout data to match FitnessCoach supported exercises
   const workouts: Workout[] = [
     {
       id: "bicep-curl",
       name: "Bicep Curl",
-      description: "Build arm strength with this classic exercise",
+      description: "Build arm strength with controlled dumbbell curls",
       difficulty: "Beginner",
       equipment: "Dumbbells",
     },
     {
-      id: "squats",
-      name: "Squats",
+      id: "squat",
+      name: "Squat",
       description: "Strengthen your lower body and core",
       difficulty: "Beginner",
       equipment: "None",
     },
     {
-      id: "push-ups",
-      name: "Push-ups",
-      description: "Full upper body workout",
+      id: "lateral-raise",
+      name: "Lateral Raise",
+      description: "Develop shoulder muscles and improve stability",
       difficulty: "Intermediate",
-      equipment: "None",
+      equipment: "Dumbbells",
     },
     {
       id: "plank",
       name: "Plank",
-      description: "Core stability and strength",
+      description: "Core stability and strength isometric exercise",
       difficulty: "Beginner",
       equipment: "None",
     },
     {
-      id: "deadlift",
-      name: "Deadlift",
-      description: "Build posterior chain strength",
-      difficulty: "Advanced",
-      equipment: "Barbell",
+      id: "tpose",
+      name: "T-Pose",
+      description: "Perfect form and posture development exercise",
+      difficulty: "Beginner",
+      equipment: "None",
     }
   ];
 
@@ -206,7 +206,7 @@ const handleChatSubmit = async (e: React.FormEvent) => {
             
             {selectedWorkout && (
               <div className="mt-6">
-                <Link href={"/coach"}>
+                <Link href={`/coach?exercise=${selectedWorkout}`}>
                   <button className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 rounded-md font-medium hover:from-blue-700 hover:to-indigo-800 transition duration-300 shadow-lg flex justify-center items-center space-x-2">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
@@ -285,7 +285,7 @@ const handleChatSubmit = async (e: React.FormEvent) => {
             </form>
           </div>
 
-          {/* Rest of your existing component... */}
+          {/* Stats Cards */}
           <div className="grid grid-cols-3 gap-4 mb-6">
             <div className="bg-gray-800 bg-opacity-75 rounded-xl p-4 border border-gray-700 shadow-md">
               <div className="flex justify-between items-start">
