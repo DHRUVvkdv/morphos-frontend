@@ -329,67 +329,6 @@ const AnalyticsDashboard = () => {
           </div>
         </div>
         
-        {/* Goal Progress Section */}
-        <div className="mt-8 bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-semibold text-gray-200">Goal Progress</h2>
-            <button className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1">
-              <Zap size={14} />
-              <span>Add Goal</span>
-            </button>
-          </div>
-          
-          <div className="space-y-6">
-            <div>
-              <div className="flex justify-between mb-2">
-                <div>
-                  <span className="text-gray-200 font-medium">Build Biceps Strength</span>
-                  <p className="text-xs text-gray-400 mt-1">Current: 45 lbs curls × 12 reps</p>
-                </div>
-                <span className="text-violet-400 font-medium">75%</span>
-              </div>
-              <div className="w-full bg-gray-700 rounded-full h-2">
-                <div 
-                  className="h-2 rounded-full bg-gradient-to-r from-blue-500 to-violet-500" 
-                  style={{ width: '75%' }}
-                ></div>
-              </div>
-            </div>
-            
-            <div>
-              <div className="flex justify-between mb-2">
-                <div>
-                  <span className="text-gray-200 font-medium">Increase Hip Flexibility</span>
-                  <p className="text-xs text-gray-400 mt-1">Hip mobility score: 82/100</p>
-                </div>
-                <span className="text-violet-400 font-medium">60%</span>
-              </div>
-              <div className="w-full bg-gray-700 rounded-full h-2">
-                <div 
-                  className="h-2 rounded-full bg-gradient-to-r from-violet-500 to-purple-500" 
-                  style={{ width: '60%' }}
-                ></div>
-              </div>
-            </div>
-            
-            <div>
-              <div className="flex justify-between mb-2">
-                <div>
-                  <span className="text-gray-200 font-medium">Workout Consistency</span>
-                  <p className="text-xs text-gray-400 mt-1">Target: 4 workouts per week</p>
-                </div>
-                <span className="text-violet-400 font-medium">85%</span>
-              </div>
-              <div className="w-full bg-gray-700 rounded-full h-2">
-                <div 
-                  className="h-2 rounded-full bg-gradient-to-r from-purple-500 to-pink-500" 
-                  style={{ width: '85%' }}
-                ></div>
-              </div>
-            </div>
-          </div>
-        </div>
-        
         {/* AI Insights Section */}
         <div className="mt-8 bg-gradient-to-br from-gray-800 via-gray-800 to-gray-800/80 rounded-xl p-6 border border-gray-700 shadow-lg relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10"></div>
@@ -418,7 +357,7 @@ const AnalyticsDashboard = () => {
       
       <footer className="mt-10 py-6 border-t border-gray-800 px-6">
         <div className="text-center text-gray-500 text-sm">
-          © 2025 Morphos. All rights reserved.
+          © 2025 Morphos . All rights reserved.
         </div>
       </footer>
     </div>

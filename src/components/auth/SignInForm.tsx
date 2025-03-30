@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { signIn } from "@/backend/userApiCalls";
+import { useUser } from "@/backend/userProvider";
 
 export default function SignInForm() {
   const [email, setEmail] = useState("");
@@ -10,6 +12,7 @@ export default function SignInForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
+  const { setUser } = useUser();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,14 +20,42 @@ export default function SignInForm() {
     setError("");
 
     try {
-      // This would be replaced with your actual auth logic
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulating API call
+      // Attempt to sign in
+      const response = await signIn(email, password);
       
-      // If successful, navigate to home page
-      router.push("/");
-    } catch (err) {
-      setError("Invalid email or password. Please try again.");
-    } finally {
+      if (!response || response.status !== 200) {
+        setError("Invalid email or password. Please try again.");
+        setIsLoading(false);
+        return;
+      }
+      
+      // Extract user data from the response
+      // Assuming the sign-in endpoint returns user data in response.data.user
+      // Adjust this according to your API's actual response structure
+      const userData = response.data.user || response.data;
+      
+      if (!userData) {
+        setError("Authentication successful, but failed to load user data.");
+        setIsLoading(false);
+        return;
+      }
+      
+      // Store user email in cookie and set user in context
+      document.cookie = `userEmail=${email}; path=/; max-age=604800`; // 7 days expiry
+      
+      // Store JWT token if one is provided
+      if (response.data.token) {
+        document.cookie = `authToken=${response.data.token}; path=/; max-age=604800`; // 7 days expiry
+      }
+      
+      // Set user in context
+      setUser(userData);
+      
+      // Redirect to homepage
+      router.push("/homepage");
+    } catch (error) {
+      console.error("Sign in error:", error);
+      setError("An error occurred during sign in. Please try again.");
       setIsLoading(false);
     }
   };
@@ -73,6 +104,9 @@ export default function SignInForm() {
             >
               Password
             </label>
+            <a href="#" className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">
+              Forgot password?
+            </a>
           </div>
           <input
             id="password"
