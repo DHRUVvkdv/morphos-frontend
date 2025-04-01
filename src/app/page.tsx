@@ -19,10 +19,10 @@ export default function LandingPage() {
         <div className={`transition-all duration-1000 transform ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
           <h1 className="text-4xl md:text-6xl font-bold mb-4">
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-600">
-              Morph
+              Morphos 
             </span>
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-500">
-              os
+              Fitness
             </span>
           </h1>
 
@@ -156,7 +156,7 @@ export default function LandingPage() {
           <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center">
             <div className="flex items-center mb-4 md:mb-0">
               <span className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-600 mr-2">
-                Morphos
+                Morphos Fitness
               </span>
               <span className="text-gray-500">© 2025. All rights reserved.</span>
             </div>

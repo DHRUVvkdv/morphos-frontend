@@ -413,18 +413,35 @@ export default function HomePage() {
     };
 
     // Function to highlight workouts mentioned in the AI response
-    const highlightRecommendedWorkouts = (message: string): void => {
-        if (!message) return;
-
-        // Check if any workout names are mentioned in the response
-        for (const workout of workouts) {
-            if (message.toLowerCase().includes(workout.name.toLowerCase())) {
-                setSelectedWorkout(workout.id);
-                // Break after finding the first match, or remove this to highlight the last match
-                break;
-            }
-        }
-    };
+    // Better workout highlighting solution
+const highlightRecommendedWorkouts = (message: string): void => {
+    if (!message) return;
+    
+    // Convert message to lowercase once for efficiency
+    const lowerMessage = message.toLowerCase();
+    
+    // Approach 1: Find all matching workouts and select the most frequent one
+    const workoutMatches = workouts.filter(workout => 
+        lowerMessage.includes(workout.name.toLowerCase())
+    );
+    
+    if (workoutMatches.length > 0) {
+        // Count occurrences of each workout name
+        const workoutCounts = workoutMatches.reduce((counts, workout) => {
+            const regex = new RegExp(workout.name.toLowerCase(), 'g');
+            const matches = lowerMessage.match(regex) || [];
+            counts[workout.id] = matches.length;
+            return counts;
+        }, {} as Record<string, number>);
+        
+        // Find the workout with the most mentions
+        const mostMentionedWorkoutId = Object.entries(workoutCounts)
+            .sort((a, b) => b[1] - a[1]) // Sort by count, descending
+            .map(entry => entry[0])[0];  // Get the ID
+            
+        setSelectedWorkout(mostMentionedWorkoutId);
+    }
+};
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-gray-900 to-indigo-950 text-white flex flex-col">
